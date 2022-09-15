@@ -1,0 +1,23 @@
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleName</key><string>SingBox</string>
+	<key>CFBundleExecutable</key><string>sbox</string>
+	<key>CFBundleIdentifier</key><string>run.daodao.SingBox</string>
+	<key>CFBundleVersion</key><string>1.0.0</string>
+	<key>CFBundleGetInfoString</key><string>Built By Golang</string>
+	<key>CFBundleShortVersionString</key><string>1.0.0</string>
+	<key>CFBundleIconFile</key><string>icon.icns</string>
+	<key>LSMinimumSystemVersion</key><string>10.13.0</string>
+	<key>NSHighResolutionCapable</key><string>true</string>
+	<key>NSHumanReadableCopyright</key><string>Copyright.........</string>
+	<key>NSAppTransportSecurity</key>
+    <dict>
+  	</dict>
+    <!-- avoid having a blurry icon and text -->
+  	<key>NSHighResolutionCapable</key>
+    <string>True</string>
+    <!-- avoid showing the app on the Dock -->
+    <key>LSUIElement</key>
+    <string>1</string>
+</dict></plist>

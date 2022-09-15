@@ -1,0 +1,79 @@
+{
+  "log": {
+    "level": "info",
+    "output": "/tmp/singbox.log",
+    "timestamp": false
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "::",
+      "listen_port": 7890,
+      "set_system_proxy": true
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
+    },
+    {
+      "type": "selector",
+      "tag": "proxy",
+      "outbounds": [
+        "server1"
+      ],
+      "default": "server1"
+    },
+    {
+      "type": "vmess",
+      "tag": "server1",
+      "server": "server.domain.com",
+      "server_port": 443,
+      "uuid": "change me",
+      "security": "auto",
+      "alter_id": 0
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "geosite": "category-ads-all",
+        "outbound": "block"
+      },
+      {
+        "process_name": ["Telegram Lite"],
+        "outbound": "proxy"
+      },
+      {
+        "geosite": ["cn"],
+        "geoip": [ "cn" ],
+        "ip_cidr": [
+          "10.0.0.0/24"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "geosite": [
+          "geolocation-!cn"
+        ],
+        "geoip": [
+          "!cn"
+        ],
+        "outbound": "proxy"
+      },
+      {
+        "inbound": [
+          "mixed-in"
+        ],
+        "outbound": "direct"
+      }
+    ],
+    "auto_detect_interface": true
+  }
+}
