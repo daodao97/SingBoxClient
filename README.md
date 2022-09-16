@@ -1,6 +1,6 @@
 ## SingBoxClient
 
-Client for [sing-box](https://github.com/SagerNet/sing-box), support macos/win/linux, [download](https://github.com/daodao97/SingBoxClient/releases)
+Client for [sing-box](https://github.com/SagerNet/sing-box), support macos/win/linux, [download](https://github.com/daodao97/SingBox/releases)
 
 ![](icon/example.png 'size:50%')
 
