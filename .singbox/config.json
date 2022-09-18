@@ -47,33 +47,28 @@
         "outbound": "block"
       },
       {
-        "process_name": ["Telegram Lite"],
-        "outbound": "proxy"
+        "process_name": [
+          "Telegram Lite"
+        ],
+        "outbound": "select"
       },
       {
-        "geosite": ["cn"],
-        "geoip": [ "cn" ],
-        "ip_cidr": [
-          "10.0.0.0/24"
-        ],
-        "outbound": "direct"
-      },
-      {
-        "geosite": [
-          "geolocation-!cn"
-        ],
+        "geosite": "cn",
         "geoip": [
-          "!cn"
+          "cn",
+          "private"
         ],
-        "outbound": "proxy"
-      },
-      {
-        "inbound": [
-          "mixed-in"
+        "ip_cidr": [
+          "10.0.0.0/24",
+          "172.16.0.0/12"
         ],
         "outbound": "direct"
+      },
+      {
+        "geosite": "geolocation-!cn",
+        "geoip": "!cn",
+        "outbound": "select"
       }
-    ],
-    "auto_detect_interface": true
+    ]
   }
 }
