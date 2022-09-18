@@ -8,6 +8,7 @@ import (
 	"github.com/skratchdot/open-golang/open"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -43,8 +44,6 @@ var Conf = ""
 
 var sb *SingBox
 
-var closeSB = func() {}
-
 type AppConf struct {
 	LaunchdAtLogin bool
 	ProxyAtLogin   bool
@@ -54,11 +53,12 @@ var appConf = &AppConf{}
 
 func main() {
 	defer func() {
-		closeSB()
+		sb.Close()
 	}()
 	home, _ = os.UserHomeDir()
 	_ = SaveDir(singbox, home, false)
 	loadConf()
+
 	Conf = filepath.Join(home, ".singbox", "config.json")
 	systray.Run(onReady, onExit)
 }
@@ -119,7 +119,7 @@ func onReady() {
 	sb = &SingBox{ConfPath: Conf}
 
 	startProxy := func(m *systray.MenuItem) {
-		_close, err := sb.Start()
+		err := sb.Start()
 		if err != nil {
 			notice(&notify.Notification{
 				Title:   "SingBox Config ERR",
@@ -127,7 +127,6 @@ func onReady() {
 			})
 			return
 		}
-		closeSB = _close
 		m.SetTitle("StopProxy")
 
 		//systray.SetIcon(_icon)
@@ -135,14 +134,17 @@ func onReady() {
 
 	}
 
+	closeProxy := func(m *systray.MenuItem) {
+		sb.Close()
+		m.SetTitle("StartProxy")
+		systray.SetTemplateIcon(_iconOff, _iconOff)
+	}
+
 	proxyMenu := addMenu(&menu{
 		Title: "StartProxy",
 		OnClick: func(m *systray.MenuItem) {
 			if sb.Running {
-				closeSB()
-				m.SetTitle("StartProxy")
-				//systray.SetIcon(_iconOff)
-				systray.SetTemplateIcon(_iconOff, _iconOff)
+				closeProxy(m)
 			} else {
 				startProxy(m)
 			}
@@ -154,19 +156,8 @@ func onReady() {
 	}
 
 	restartProxy := func() {
-		closeSB()
-		_close, err := sb.Start()
-		if err != nil {
-			notice(&notify.Notification{
-				Title:   "SingBox Config ERR",
-				Message: err.Error(),
-			})
-			return
-		}
-		closeSB = _close
-		proxyMenu.SetTitle("StopProxy")
-		//systray.SetIcon(_icon)
-		systray.SetTemplateIcon(_icon, _icon)
+		closeProxy(proxyMenu)
+		startProxy(proxyMenu)
 	}
 
 	addMenu(&menu{
@@ -175,9 +166,7 @@ func onReady() {
 			if sb.Running {
 				restartProxy()
 			} else {
-				notice(&notify.Notification{
-					Title: "Proxy not start, can not restart",
-				})
+				startProxy(proxyMenu)
 			}
 		},
 	})
@@ -185,7 +174,11 @@ func onReady() {
 	addMenu(&menu{
 		Title: "EditConfig",
 		OnClick: func(m *systray.MenuItem) {
-			_ = open.Run(filepath.Join(home, ".singbox"))
+			_, err := exec.Command("code", Conf).Output()
+			fmt.Println(err)
+			if err != nil {
+				_ = open.Run(filepath.Join(home, ".singbox"))
+			}
 		},
 	})
 
@@ -247,6 +240,13 @@ func onReady() {
 	}, appConf.ProxyAtLogin)
 
 	addMenu(&menu{
+		Title: "Dashboard",
+		OnClick: func(m *systray.MenuItem) {
+			_ = open.Run("http://yacd.metacubex.one/#/configs")
+		},
+	})
+
+	addMenu(&menu{
 		Title: "GithubStar",
 		OnClick: func(m *systray.MenuItem) {
 			_ = open.Run("http://github.com/daodao97/SingBox")
@@ -257,7 +257,7 @@ func onReady() {
 	addMenu(&menu{
 		Title: "Quit",
 		OnClick: func(m *systray.MenuItem) {
-			closeSB()
+			sb.Close()
 			systray.Quit()
 		},
 	})
@@ -290,7 +290,7 @@ func watcher(sb *SingBox, cb func(actType string)) {
 				if !ok {
 					return
 				}
-				log.Println("event:", event)
+				fmt.Println("event:", event, fmt.Sprintf("%v", sb.Running))
 				if strings.Contains(event.String(), "WRITE") && sb.Running {
 					notice(&notify.Notification{
 						Title:   "SingBox Config Change",
@@ -302,14 +302,14 @@ func watcher(sb *SingBox, cb func(actType string)) {
 				if !ok {
 					return
 				}
-				log.Println("error:", err)
+				fmt.Println("error:", err)
 			}
 		}
 	}()
 
 	err = watcher.Add(Conf)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
 	}
 
 	<-make(chan struct{})
@@ -320,7 +320,7 @@ func notice(msg *notify.Notification) {
 	n := notify.NewNotifications()
 	err := n.Notify(msg)
 	if err != nil {
-
+		fmt.Println("notify err", err)
 	}
 }
 

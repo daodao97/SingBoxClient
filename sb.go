@@ -15,9 +15,21 @@ import (
 type SingBox struct {
 	Running  bool
 	ConfPath string
+	instance *box.Box
+	cancel   context.CancelFunc
 }
 
-func (s *SingBox) Start() (close func(), err error) {
+func (s *SingBox) Close() {
+	if s.instance != nil {
+		_ = s.instance.Close()
+	}
+	if s.cancel != nil {
+		s.cancel()
+	}
+	s.Running = false
+}
+
+func (s *SingBox) Start() error {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Println(err)
@@ -27,17 +39,15 @@ func (s *SingBox) Start() (close func(), err error) {
 
 	instance, cancel, err := create(configPath)
 	if err != nil {
-		return func() {}, err
+		return err
 	}
 	runtimeDebug.FreeOSMemory()
 
 	s.Running = true
+	s.instance = instance
+	s.cancel = cancel
 
-	return func() {
-		cancel()
-		instance.Close()
-		s.Running = false
-	}, nil
+	return nil
 }
 
 func create(configPath string) (*box.Box, context.CancelFunc, error) {
