@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -41,15 +42,21 @@ var home string
 var singbox embed.FS
 
 var Conf = ""
+var ConfDir = ""
 
 var sb *SingBox
+
+var confFileReg = regexp.MustCompile(`^config(\.\w+)?.json$`)
 
 type AppConf struct {
 	LaunchdAtLogin bool
 	ProxyAtLogin   bool
+	ActiveConfig   string
 }
 
-var appConf = &AppConf{}
+var appConf = &AppConf{
+	ActiveConfig: "config.json",
+}
 
 func main() {
 	defer func() {
@@ -59,6 +66,7 @@ func main() {
 	_ = SaveDir(singbox, home, false)
 	loadConf()
 
+	ConfDir = filepath.Join(home, ".singbox")
 	Conf = filepath.Join(home, ".singbox", "config.json")
 	systray.Run(onReady, onExit)
 }
@@ -104,6 +112,23 @@ func addCheckboxMenu(menu *menu, checked bool) *systray.MenuItem {
 	return m
 }
 
+func addSubCheckboxMenu(me *systray.MenuItem, menu *menu, checked bool) *systray.MenuItem {
+	m := me.AddSubMenuItemCheckbox(menu.Title, menu.Tips, checked)
+	if len(menu.Icon) > 0 {
+		m.SetIcon(menu.Icon)
+	}
+	go func() {
+		for {
+			select {
+			case <-m.ClickedCh:
+				menu.OnClick(m)
+			}
+		}
+	}()
+
+	return m
+}
+
 func onReady() {
 
 	_icon := icon
@@ -119,7 +144,7 @@ func onReady() {
 	sb = &SingBox{ConfPath: Conf}
 
 	startProxy := func(m *systray.MenuItem) {
-		err := sb.Start()
+		err := sb.Start(filepath.Join(ConfDir, appConf.ActiveConfig))
 		if err != nil {
 			notice(&notify.Notification{
 				Title:   "SingBox Config ERR",
@@ -246,6 +271,34 @@ func onReady() {
 		},
 	})
 
+	var confList []*menu
+
+	if files, err := dirFileList(ConfDir); err == nil {
+		for _, v := range files {
+			fileName := v
+			if confFileReg.MatchString(fileName) == false {
+				continue
+			}
+			confList = append(confList, &menu{
+				Title: fileName,
+				Tips:  "",
+				Icon:  nil,
+				OnClick: func(m *systray.MenuItem) {
+					if fileName == appConf.ActiveConfig {
+						return
+					}
+					appConf.ActiveConfig = fileName
+					saveConf()
+					fmt.Println(appConf.ActiveConfig)
+					restartProxy()
+				},
+			})
+		}
+	}
+
+	fmt.Println(confList)
+	addRadioMenu("SelectConfig", appConf.ActiveConfig, confList)
+
 	addMenu(&menu{
 		Title: "GithubStar",
 		OnClick: func(m *systray.MenuItem) {
@@ -291,7 +344,7 @@ func watcher(sb *SingBox, cb func(actType string)) {
 					return
 				}
 				fmt.Println("event:", event, fmt.Sprintf("%v", sb.Running))
-				if strings.Contains(event.String(), "WRITE") && sb.Running {
+				if filepath.Join(ConfDir, appConf.ActiveConfig) == event.Name && strings.Contains(event.String(), "WRITE") && sb.Running {
 					notice(&notify.Notification{
 						Title:   "SingBox Config Change",
 						Message: "Click me to reload SingBox",
@@ -307,9 +360,13 @@ func watcher(sb *SingBox, cb func(actType string)) {
 		}
 	}()
 
-	err = watcher.Add(Conf)
-	if err != nil {
-		fmt.Println(err)
+	if files, err := dirFileList(ConfDir); err == nil {
+		for _, v := range files {
+			err = watcher.Add(filepath.Join(ConfDir, v))
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
 	}
 
 	<-make(chan struct{})
@@ -340,5 +397,8 @@ func loadConf() {
 		err = json.Unmarshal(bt, appConf)
 	} else {
 		log.Println("read app.json err", err)
+	}
+	if appConf.ActiveConfig == "" {
+		appConf.ActiveConfig = "config.json"
 	}
 }

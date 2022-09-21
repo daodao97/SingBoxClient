@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"path/filepath"
 	runtimeDebug "runtime/debug"
 
 	"github.com/pkg/errors"
@@ -29,13 +28,12 @@ func (s *SingBox) Close() {
 	s.Running = false
 }
 
-func (s *SingBox) Start() error {
+func (s *SingBox) Start(configPath string) error {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Println(err)
 		}
 	}()
-	configPath := filepath.Join(s.ConfPath)
 
 	instance, cancel, err := create(configPath)
 	if err != nil {

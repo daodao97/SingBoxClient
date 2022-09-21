@@ -2,7 +2,9 @@ package main
 
 import (
 	"embed"
+	"github.com/getlantern/systray"
 	"io/fs"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -51,4 +53,42 @@ func SaveDir(efs embed.FS, dir string, overwrite bool) error {
 			return nil
 		}
 	})
+}
+
+func dirFileList(dir string) ([]string, error) {
+	var files []string
+	list, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range list {
+		files = append(files, v.Name())
+	}
+	return files, nil
+}
+
+func addRadioMenu(title string, defaultTitle string, sub []*menu) {
+	boot := systray.AddMenuItem(title, "")
+	var miArr []*systray.MenuItem
+	for i, v := range sub {
+		mi := boot.AddSubMenuItemCheckbox(v.Title, v.Title, v.Title == defaultTitle)
+		_v := v
+		_i := i
+		miArr = append(miArr, mi)
+		go func() {
+			for {
+				select {
+				case <-mi.ClickedCh:
+					_v.OnClick(mi)
+					for j, e := range miArr {
+						if j == _i {
+							e.Check()
+						} else {
+							e.Uncheck()
+						}
+					}
+				}
+			}
+		}()
+	}
 }
