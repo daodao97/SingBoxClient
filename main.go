@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/emersion/go-autostart"
 	"github.com/fsnotify/fsnotify"
@@ -58,6 +59,13 @@ var appConf = &AppConf{
 	ActiveConfig: "config.json",
 }
 
+type menu struct {
+	Title   string
+	Tips    string
+	Icon    []byte
+	OnClick func(m *systray.MenuItem)
+}
+
 func main() {
 	defer func() {
 		sb.Close()
@@ -71,66 +79,7 @@ func main() {
 	systray.Run(onReady, onExit)
 }
 
-type menu struct {
-	Title   string
-	Tips    string
-	Icon    []byte
-	OnClick func(m *systray.MenuItem)
-}
-
-func addMenu(menu *menu) *systray.MenuItem {
-	m := systray.AddMenuItem(menu.Title, menu.Tips)
-	if len(menu.Icon) > 0 {
-		m.SetIcon(menu.Icon)
-	}
-	go func() {
-		for {
-			select {
-			case <-m.ClickedCh:
-				menu.OnClick(m)
-			}
-		}
-	}()
-
-	return m
-}
-
-func addCheckboxMenu(menu *menu, checked bool) *systray.MenuItem {
-	m := systray.AddMenuItemCheckbox(menu.Title, menu.Tips, checked)
-	if len(menu.Icon) > 0 {
-		m.SetIcon(menu.Icon)
-	}
-	go func() {
-		for {
-			select {
-			case <-m.ClickedCh:
-				menu.OnClick(m)
-			}
-		}
-	}()
-
-	return m
-}
-
-func addSubCheckboxMenu(me *systray.MenuItem, menu *menu, checked bool) *systray.MenuItem {
-	m := me.AddSubMenuItemCheckbox(menu.Title, menu.Tips, checked)
-	if len(menu.Icon) > 0 {
-		m.SetIcon(menu.Icon)
-	}
-	go func() {
-		for {
-			select {
-			case <-m.ClickedCh:
-				menu.OnClick(m)
-			}
-		}
-	}()
-
-	return m
-}
-
 func onReady() {
-
 	_icon := icon
 	_iconOff := iconOff
 
@@ -139,24 +88,40 @@ func onReady() {
 		_iconOff = iconOffWin
 	}
 
-	//systray.SetIcon(_iconOff)
 	systray.SetTemplateIcon(_iconOff, _iconOff)
 	sb = &SingBox{ConfPath: Conf}
 
-	startProxy := func(m *systray.MenuItem) {
+	_startProxy := func(m *systray.MenuItem) {
 		err := sb.Start(filepath.Join(ConfDir, appConf.ActiveConfig))
 		if err != nil {
 			notice(&notify.Notification{
-				Title:   "SingBox Config ERR",
+				Title:   "SingBox Start error",
 				Message: err.Error(),
 			})
 			return
 		}
 		m.SetTitle("StopProxy")
-
-		//systray.SetIcon(_icon)
 		systray.SetTemplateIcon(_icon, _icon)
+	}
 
+	startProxy := func(m *systray.MenuItem) {
+		err := sb.Start(filepath.Join(ConfDir, appConf.ActiveConfig))
+		if err != nil {
+			if strings.Contains(err.Error(), "no route to internet") {
+				go func() {
+					time.Sleep(time.Second * 10)
+					_startProxy(m)
+				}()
+			} else {
+				notice(&notify.Notification{
+					Title:   "SingBox Config ERR",
+					Message: err.Error(),
+				})
+			}
+			return
+		}
+		m.SetTitle("StopProxy")
+		systray.SetTemplateIcon(_icon, _icon)
 	}
 
 	closeProxy := func(m *systray.MenuItem) {
@@ -200,7 +165,6 @@ func onReady() {
 		Title: "EditConfig",
 		OnClick: func(m *systray.MenuItem) {
 			_, err := exec.Command("code", Conf).Output()
-			fmt.Println(err)
 			if err != nil {
 				_ = open.Run(filepath.Join(home, ".singbox"))
 			}
@@ -267,7 +231,7 @@ func onReady() {
 	addMenu(&menu{
 		Title: "Dashboard",
 		OnClick: func(m *systray.MenuItem) {
-			_ = open.Run("http://yacd.metacubex.one/#/configs")
+			_ = open.Run("http://yacd.metacubex.one")
 		},
 	})
 
@@ -281,8 +245,6 @@ func onReady() {
 			}
 			confList = append(confList, &menu{
 				Title: fileName,
-				Tips:  "",
-				Icon:  nil,
 				OnClick: func(m *systray.MenuItem) {
 					if fileName == appConf.ActiveConfig {
 						return
@@ -296,17 +258,25 @@ func onReady() {
 		}
 	}
 
-	fmt.Println(confList)
 	addRadioMenu("SelectConfig", appConf.ActiveConfig, confList)
 
-	addMenu(&menu{
-		Title: "GithubStar",
-		OnClick: func(m *systray.MenuItem) {
-			_ = open.Run("http://github.com/daodao97/SingBox")
+	addMenuGroup("About", []*menu{
+		{
+			Title: "SingBox",
+			OnClick: func(m *systray.MenuItem) {
+				_ = open.Run("http://github.com/daodao97/SingBox")
+			},
+		},
+		{
+			Title: "sing-box docs",
+			OnClick: func(m *systray.MenuItem) {
+				_ = open.Run("https://sing-box.sagernet.org/zh/configuration/")
+			},
 		},
 	})
 
 	systray.AddSeparator()
+
 	addMenu(&menu{
 		Title: "Quit",
 		OnClick: func(m *systray.MenuItem) {
@@ -336,30 +306,6 @@ func watcher(sb *SingBox, cb func(actType string)) {
 	}
 	defer watcher.Close()
 
-	go func() {
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				fmt.Println("event:", event, fmt.Sprintf("%v", sb.Running))
-				if filepath.Join(ConfDir, appConf.ActiveConfig) == event.Name && strings.Contains(event.String(), "WRITE") && sb.Running {
-					notice(&notify.Notification{
-						Title:   "SingBox Config Change",
-						Message: "Click me to reload SingBox",
-						OnClick: cb,
-					})
-				}
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-				fmt.Println("error:", err)
-			}
-		}
-	}()
-
 	if files, err := dirFileList(ConfDir); err == nil {
 		for _, v := range files {
 			err = watcher.Add(filepath.Join(ConfDir, v))
@@ -369,7 +315,27 @@ func watcher(sb *SingBox, cb func(actType string)) {
 		}
 	}
 
-	<-make(chan struct{})
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			fmt.Println("event:", event, fmt.Sprintf("%v", sb.Running))
+			if filepath.Join(ConfDir, appConf.ActiveConfig) == event.Name && strings.Contains(event.String(), "WRITE") && sb.Running {
+				notice(&notify.Notification{
+					Title:   "SingBox Config Change",
+					Message: "Click me to reload SingBox",
+					OnClick: cb,
+				})
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			fmt.Println("error:", err)
+		}
+	}
 }
 
 func notice(msg *notify.Notification) {

@@ -92,3 +92,55 @@ func addRadioMenu(title string, defaultTitle string, sub []*menu) {
 		}()
 	}
 }
+
+func addMenu(menu *menu) *systray.MenuItem {
+	m := systray.AddMenuItem(menu.Title, menu.Tips)
+	if len(menu.Icon) > 0 {
+		m.SetIcon(menu.Icon)
+	}
+	go func() {
+		for {
+			select {
+			case <-m.ClickedCh:
+				menu.OnClick(m)
+			}
+		}
+	}()
+
+	return m
+}
+
+func addCheckboxMenu(menu *menu, checked bool) *systray.MenuItem {
+	m := systray.AddMenuItemCheckbox(menu.Title, menu.Tips, checked)
+	if len(menu.Icon) > 0 {
+		m.SetIcon(menu.Icon)
+	}
+	go func() {
+		for {
+			select {
+			case <-m.ClickedCh:
+				menu.OnClick(m)
+			}
+		}
+	}()
+
+	return m
+}
+
+func addMenuGroup(title string, sub []*menu) {
+	boot := systray.AddMenuItem(title, "")
+	var miArr []*systray.MenuItem
+	for _, v := range sub {
+		mi := boot.AddSubMenuItem(v.Title, v.Title)
+		_v := v
+		miArr = append(miArr, mi)
+		go func() {
+			for {
+				select {
+				case <-mi.ClickedCh:
+					_v.OnClick(mi)
+				}
+			}
+		}()
+	}
+}
