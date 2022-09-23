@@ -80,6 +80,7 @@ func main() {
 }
 
 func onReady() {
+
 	_icon := icon
 	_iconOff := iconOff
 

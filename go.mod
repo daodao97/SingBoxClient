@@ -57,20 +57,21 @@ require (
 	github.com/sagernet/go-tun2socks v1.16.12-0.20220818015926-16cb67876a61 // indirect
 	github.com/sagernet/netlink v0.0.0-20220905062125-8043b4a9aa97 // indirect
 	github.com/sagernet/quic-go v0.0.0-20220818150011-de611ab3e2bb // indirect
-	github.com/sagernet/sing v0.0.0-20220916071326-834794b006ea // indirect
+	github.com/sagernet/sing v0.0.0-20220921101604-86d7d510231f // indirect
 	github.com/sagernet/sing-dns v0.0.0-20220915084601-812e0864b45b // indirect
 	github.com/sagernet/sing-shadowsocks v0.0.0-20220819002358-7461bb09a8f6 // indirect
-	github.com/sagernet/sing-tun v0.0.0-20220916073459-0032242c9617 // indirect
-	github.com/sagernet/sing-vmess v0.0.0-20220913015714-c4ab86d40e12 // indirect
+	github.com/sagernet/sing-tun v0.0.0-20220922083325-80ee99472704 // indirect
+	github.com/sagernet/sing-vmess v0.0.0-20220921140858-b6a1bdee672f // indirect
 	github.com/sagernet/smux v0.0.0-20220831015742-e0f1988e3195 // indirect
 	github.com/sagernet/websocket v0.0.0-20220913015213-615516348b4e // indirect
+	github.com/spf13/cast v1.5.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.22.0 // indirect
 	go4.org/netipx v0.0.0-20220812043211-3cc044ffd68d // indirect
-	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90 // indirect
+	golang.org/x/crypto v0.0.0-20220919173607-35f4265a4bc0 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/net v0.0.0-20220909164309-bea034e7d591 // indirect
@@ -84,6 +85,7 @@ require (
 	google.golang.org/grpc v1.49.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gvisor.dev/gvisor v0.0.0-20220901235040-6ca97ef2ce1c // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
