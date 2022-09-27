@@ -1,4 +1,9 @@
 {
+  "experimental": {
+    "clash_api": {
+      "external_controller": "127.0.0.1:9090"
+    }
+  },
   "log": {
     "level": "info",
     "output": "/tmp/singbox.log",
@@ -41,6 +46,12 @@
     }
   ],
   "route": {
+    "geoip": {
+      "path": "__CONF_DIR__/geoip.db"
+    },
+    "geosite": {
+      "path": "__CONF_DIR__/geosite.db"
+    },
     "rules": [
       {
         "geosite": "category-ads-all",

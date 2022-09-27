@@ -49,6 +49,8 @@ var sb *SingBox
 
 var confFileReg = regexp.MustCompile(`^config(\.\w+)?.json$`)
 
+var _fs = afero.NewOsFs()
+
 type AppConf struct {
 	LaunchdAtLogin bool
 	ProxyAtLogin   bool
@@ -72,10 +74,18 @@ func main() {
 	}()
 	home, _ = os.UserHomeDir()
 	_ = SaveDir(singbox, home, false)
-	loadConf()
 
+	loadAppConf()
 	ConfDir = filepath.Join(home, ".singbox")
 	Conf = filepath.Join(home, ".singbox", "config.json")
+
+	if err := initSBConf(); err != nil {
+		notice(&notify.Notification{
+			Title:   "Config Init",
+			Message: err.Error(),
+		})
+	}
+
 	systray.Run(onReady, onExit)
 }
 
@@ -106,6 +116,12 @@ func onReady() {
 	}
 
 	startProxy := func(m *systray.MenuItem) {
+		if exist, err := fileExist(filepath.Join(ConfDir, "geoip.db")); err == nil && !exist {
+			notice(&notify.Notification{
+				Title:   "SingBox",
+				Message: "Initializing the environment and the system will boot later",
+			})
+		}
 		err := sb.Start(filepath.Join(ConfDir, appConf.ActiveConfig))
 		if err != nil {
 			if strings.Contains(err.Error(), "no route to internet") {
@@ -211,7 +227,7 @@ func onReady() {
 
 			log.Println("Done!")
 			appConf.LaunchdAtLogin = m.Checked()
-			saveConf()
+			saveAppConf()
 		},
 	}, appConf.LaunchdAtLogin)
 
@@ -225,7 +241,7 @@ func onReady() {
 				m.Uncheck()
 			}
 			appConf.ProxyAtLogin = m.Checked()
-			saveConf()
+			saveAppConf()
 		},
 	}, appConf.ProxyAtLogin)
 
@@ -251,7 +267,7 @@ func onReady() {
 						return
 					}
 					appConf.ActiveConfig = fileName
-					saveConf()
+					saveAppConf()
 					fmt.Println(appConf.ActiveConfig)
 					restartProxy()
 				},
@@ -348,18 +364,25 @@ func notice(msg *notify.Notification) {
 	}
 }
 
-func saveConf() {
-	appFS := afero.NewOsFs()
+func initSBConf() error {
+	fp := filepath.Join(ConfDir, appConf.ActiveConfig)
+	cf, err := readFile(fp)
+	if err != nil {
+		return err
+	}
+	return saveFile(fp, []byte(strings.ReplaceAll(string(cf), "__CONF_DIR__", ConfDir)))
+}
+
+func saveAppConf() {
 	j, _ := json.Marshal(appConf)
-	err := afero.WriteFile(appFS, filepath.Join(home, ".singbox", "app.json"), j, 0644)
+	err := saveFile(filepath.Join(home, ".singbox", "app.json"), j)
 	if err != nil {
 		log.Println("save app.json err", err)
 	}
 }
 
-func loadConf() {
-	appFS := afero.NewOsFs()
-	bt, err := afero.ReadFile(appFS, filepath.Join(home, ".singbox", "app.json"))
+func loadAppConf() {
+	bt, err := readFile(filepath.Join(home, ".singbox", "app.json"))
 	if err == nil {
 		err = json.Unmarshal(bt, appConf)
 	} else {
@@ -368,4 +391,16 @@ func loadConf() {
 	if appConf.ActiveConfig == "" {
 		appConf.ActiveConfig = "config.json"
 	}
+}
+
+func readFile(path string) ([]byte, error) {
+	return afero.ReadFile(_fs, path)
+}
+
+func saveFile(path string, content []byte) error {
+	return afero.WriteFile(_fs, path, content, 0644)
+}
+
+func fileExist(path string) (bool, error) {
+	return afero.Exists(_fs, path)
 }
