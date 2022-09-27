@@ -46,12 +46,6 @@
     }
   ],
   "route": {
-    "geoip": {
-      "path": "__CONF_DIR__/geoip.db"
-    },
-    "geosite": {
-      "path": "__CONF_DIR__/geosite.db"
-    },
     "rules": [
       {
         "geosite": "category-ads-all",

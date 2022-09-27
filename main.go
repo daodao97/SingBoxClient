@@ -79,13 +79,6 @@ func main() {
 	ConfDir = filepath.Join(home, ".singbox")
 	Conf = filepath.Join(home, ".singbox", "config.json")
 
-	if err := initSBConf(); err != nil {
-		notice(&notify.Notification{
-			Title:   "Config Init",
-			Message: err.Error(),
-		})
-	}
-
 	systray.Run(onReady, onExit)
 }
 

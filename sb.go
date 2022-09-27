@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"path/filepath"
 	runtimeDebug "runtime/debug"
 
 	"github.com/pkg/errors"
@@ -58,6 +59,19 @@ func create(configPath string) (*box.Box, context.CancelFunc, error) {
 		options.Log = &option.LogOptions{}
 	}
 	options.Log.DisableColor = true
+
+	if options.Route.Geosite == nil {
+		options.Route.Geosite = &option.GeositeOptions{}
+	}
+	if options.Route.Geosite.Path == "" {
+		options.Route.Geosite.Path = filepath.Join(ConfDir, "geosite.db")
+	}
+	if options.Route.GeoIP == nil {
+		options.Route.GeoIP = &option.GeoIPOptions{}
+	}
+	if options.Route.GeoIP.Path == "" {
+		options.Route.GeoIP.Path = filepath.Join(ConfDir, "geoip.db")
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	instance, err := box.New(ctx, options)
