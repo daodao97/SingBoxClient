@@ -11,6 +11,7 @@ require (
 	github.com/sagernet/sing-box v1.0.3
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/spf13/afero v1.9.2
+	github.com/tidwall/jsonc v0.3.2
 )
 
 require (

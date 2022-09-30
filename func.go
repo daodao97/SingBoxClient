@@ -3,12 +3,14 @@ package main
 import (
 	"embed"
 	"github.com/getlantern/systray"
+	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"io/fs"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
-
-	"github.com/pkg/errors"
+	"runtime"
 )
 
 func SaveDir(efs embed.FS, dir string, overwrite bool) error {
@@ -143,4 +145,38 @@ func addMenuGroup(title string, sub []*menu) {
 			}
 		}()
 	}
+}
+
+var _fs = afero.NewOsFs()
+
+func readFile(path string) ([]byte, error) {
+	return afero.ReadFile(_fs, path)
+}
+
+func saveFile(path string, content []byte) error {
+	return afero.WriteFile(_fs, path, content, 0644)
+}
+
+func fileExist(path string) (bool, error) {
+	return afero.Exists(_fs, path)
+}
+
+func isWin() bool {
+	return runtime.GOOS == "windows"
+}
+
+func isMac() bool {
+	return runtime.GOOS == "darwin"
+}
+
+func runAsAdministrator(cb func()) error {
+	str := `do shell script "/Applications/SingBox.app/Contents/MacOS/sbox >/dev/null 2>&1 &" with prompt "开启增强模式" with administrator privileges`
+	cmd := exec.Command("osascript", "-e", str)
+	_, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+	cb()
+	os.Exit(0)
+	return nil
 }

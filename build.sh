@@ -27,6 +27,32 @@ function buildMac() {
   echo "macos app build success"
 }
 
+function buildMacM1() {
+  rm -rf icons.iconset
+  mkdir icons.iconset
+  sips -z 16 16     icon/logo.png --out icons.iconset/icon_16x16.png
+  sips -z 32 32     icon/logo.png --out icons.iconset/icon_16x16@2x.png
+  sips -z 32 32     icon/logo.png --out icons.iconset/icon_32x32.png
+  sips -z 64 64     icon/logo.png --out icons.iconset/icon_32x32@2x.png
+  sips -z 128 128   icon/logo.png --out icons.iconset/icon_128x128.png
+  sips -z 256 256   icon/logo.png --out icons.iconset/icon_128x128@2x.png
+  sips -z 256 256   icon/logo.png --out icons.iconset/icon_256x256.png
+  sips -z 512 512   icon/logo.png --out icons.iconset/icon_256x256@2x.png
+  sips -z 512 512   icon/logo.png --out icons.iconset/icon_512x512.png
+  sips -z 1024 1024 icon/logo.png --out icons.iconset/icon_512x512@2x.png
+
+  rm -rf build/SingBox.app
+  cp -rf build/meta/SingBox.app build
+
+  iconutil -c icns icons.iconset -o build/SingBox.app/Contents/Resources/icon.icns
+  rm -rf icons.iconset
+
+  env GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -tags with_clash_api -o build/SingBox.app/Contents/MacOS/sbox .
+  (cd build && zip -r SingBox-mac-arm64.zip SingBox.app)
+  rm -rf build/SingBox.app
+  echo "macos app build success"
+}
+
 function buildWin() {
     rsrc -manifest build/meta/win/sbox.exe.manifest -ico icon/logo.ico -o sbox.exe.syso
     # brew info mingw-w64
@@ -60,11 +86,15 @@ case "${p}" in
   mac)
     buildMac
   ;;
+  m1)
+    buildMacM1
+  ;;
   win)
     buildWin
   ;;
   *)
     buildMac
+    buildMacM1
     buildWin
   ;;
 esac

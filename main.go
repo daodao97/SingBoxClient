@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
 
@@ -19,7 +18,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	notify "github.com/getlantern/notifier"
 	"github.com/getlantern/systray"
-	"github.com/spf13/afero"
 )
 
 //go:embed icon/icon.png
@@ -48,8 +46,6 @@ var ConfDir = ""
 var sb *SingBox
 
 var confFileReg = regexp.MustCompile(`^config(\.\w+)?.json$`)
-
-var _fs = afero.NewOsFs()
 
 type AppConf struct {
 	LaunchdAtLogin bool
@@ -87,7 +83,7 @@ func onReady() {
 	_icon := icon
 	_iconOff := iconOff
 
-	if runtime.GOOS == "windows" {
+	if isWin() {
 		_icon = iconWin
 		_iconOff = iconOffWin
 	}
@@ -117,6 +113,17 @@ func onReady() {
 		}
 		err := sb.Start(filepath.Join(ConfDir, appConf.ActiveConfig))
 		if err != nil {
+			if strings.Contains(err.Error(), "configure tun interface") {
+				if strings.Contains(err.Error(), "Access is denied") {
+					notice2("when tun mod, please run app as admin")
+					return
+				}
+				if strings.Contains(err.Error(), "operation not permitted") {
+					_ = runAsAdministrator(func() {
+						sb.Close()
+					})
+				}
+			}
 			if strings.Contains(err.Error(), "no route to internet") {
 				go func() {
 					time.Sleep(time.Second * 10)
@@ -143,16 +150,20 @@ func onReady() {
 	proxyMenu := addMenu(&menu{
 		Title: "StartProxy",
 		OnClick: func(m *systray.MenuItem) {
+			m.Disable()
 			if sb.Running {
 				closeProxy(m)
 			} else {
 				startProxy(m)
 			}
+			m.Enable()
 		},
 	})
 
 	if appConf.ProxyAtLogin {
+		proxyMenu.Disable()
 		startProxy(proxyMenu)
+		proxyMenu.Enable()
 	}
 
 	restartProxy := func() {
@@ -190,7 +201,7 @@ func onReady() {
 				Exec:        []string{"open", "-a", "SingBox"},
 			}
 
-			if runtime.GOOS == "windows" {
+			if isWin() {
 				dir, _ := os.Getwd()
 				app.Exec = []string{filepath.Join(dir, "SingBox.exe")}
 			}
@@ -318,6 +329,9 @@ func watcher(sb *SingBox, cb func(actType string)) {
 
 	if files, err := dirFileList(ConfDir); err == nil {
 		for _, v := range files {
+			if strings.Contains(v, ".log") {
+				continue
+			}
 			err = watcher.Add(filepath.Join(ConfDir, v))
 			if err != nil {
 				fmt.Println(err)
@@ -357,13 +371,12 @@ func notice(msg *notify.Notification) {
 	}
 }
 
-func initSBConf() error {
-	fp := filepath.Join(ConfDir, appConf.ActiveConfig)
-	cf, err := readFile(fp)
+func notice2(message string) {
+	n := notify.NewNotifications()
+	err := n.Notify(&notify.Notification{Title: "SingBox", Message: message, Sender: "run.daodao.SingBox"})
 	if err != nil {
-		return err
+		fmt.Println("notify err", err)
 	}
-	return saveFile(fp, []byte(strings.ReplaceAll(string(cf), "__CONF_DIR__", ConfDir)))
 }
 
 func saveAppConf() {
@@ -384,16 +397,4 @@ func loadAppConf() {
 	if appConf.ActiveConfig == "" {
 		appConf.ActiveConfig = "config.json"
 	}
-}
-
-func readFile(path string) ([]byte, error) {
-	return afero.ReadFile(_fs, path)
-}
-
-func saveFile(path string, content []byte) error {
-	return afero.WriteFile(_fs, path, content, 0644)
-}
-
-func fileExist(path string) (bool, error) {
-	return afero.Exists(_fs, path)
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/tidwall/jsonc"
 	"log"
 	"os"
 	"path/filepath"
@@ -59,6 +60,7 @@ func create(configPath string) (*box.Box, context.CancelFunc, error) {
 		options.Log = &option.LogOptions{}
 	}
 	options.Log.DisableColor = true
+	options.Log.Output = filepath.Join(ConfDir, "singbox.log")
 
 	if options.Route.Geosite == nil {
 		options.Route.Geosite = &option.GeositeOptions{}
@@ -96,8 +98,9 @@ func readConfig(configPath string) (option.Options, error) {
 	if err != nil {
 		return option.Options{}, errors.Wrap(err, "read config")
 	}
+
 	var options option.Options
-	err = options.UnmarshalJSON(configContent)
+	err = options.UnmarshalJSON(jsonc.ToJSON(configContent))
 	if err != nil {
 		return option.Options{}, errors.Wrap(err, "decode config")
 	}
