@@ -67,7 +67,7 @@
       {
         "geosite": "geolocation-!cn",
         "geoip": "!cn",
-        "outbound": "select"
+        "outbound": "selector"
       }
     ]
   }
