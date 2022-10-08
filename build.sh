@@ -21,7 +21,7 @@ function buildMac() {
   iconutil -c icns icons.iconset -o build/SingBox.app/Contents/Resources/icon.icns
   rm -rf icons.iconset
 
-  env GOOS=darwin GOARCH=amd64 go build -tags with_clash_api -o build/SingBox.app/Contents/MacOS/sbox .
+  env GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go build -tags with_clash_api -o build/SingBox.app/Contents/MacOS/sbox .
   (cd build && zip -r SingBox-mac-amd64.zip SingBox.app)
   rm -rf build/SingBox.app
   echo "macos app build success"
