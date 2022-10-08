@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
-set -x
 
 function buildMac() {
+  name=$1$([ -n "$2" ] && echo -$2 || echo )
+  echo "start build mac-${name}"
   rm -rf icons.iconset
   mkdir icons.iconset
-  sips -z 16 16     icon/logo.png --out icons.iconset/icon_16x16.png
-  sips -z 32 32     icon/logo.png --out icons.iconset/icon_16x16@2x.png
-  sips -z 32 32     icon/logo.png --out icons.iconset/icon_32x32.png
-  sips -z 64 64     icon/logo.png --out icons.iconset/icon_32x32@2x.png
-  sips -z 128 128   icon/logo.png --out icons.iconset/icon_128x128.png
-  sips -z 256 256   icon/logo.png --out icons.iconset/icon_128x128@2x.png
-  sips -z 256 256   icon/logo.png --out icons.iconset/icon_256x256.png
-  sips -z 512 512   icon/logo.png --out icons.iconset/icon_256x256@2x.png
-  sips -z 512 512   icon/logo.png --out icons.iconset/icon_512x512.png
-  sips -z 1024 1024 icon/logo.png --out icons.iconset/icon_512x512@2x.png
+  echo "build macos icons"
+  sips -z 16 16     icon/logo.png --out icons.iconset/icon_16x16.png      1>/dev/null
+  sips -z 32 32     icon/logo.png --out icons.iconset/icon_16x16@2x.png   1>/dev/null
+  sips -z 32 32     icon/logo.png --out icons.iconset/icon_32x32.png      1>/dev/null
+  sips -z 64 64     icon/logo.png --out icons.iconset/icon_32x32@2x.png   1>/dev/null
+  sips -z 128 128   icon/logo.png --out icons.iconset/icon_128x128.png    1>/dev/null
+  sips -z 256 256   icon/logo.png --out icons.iconset/icon_128x128@2x.png 1>/dev/null
+  sips -z 256 256   icon/logo.png --out icons.iconset/icon_256x256.png    1>/dev/null
+  sips -z 512 512   icon/logo.png --out icons.iconset/icon_256x256@2x.png 1>/dev/null
+  sips -z 512 512   icon/logo.png --out icons.iconset/icon_512x512.png    1>/dev/null
+  sips -z 1024 1024 icon/logo.png --out icons.iconset/icon_512x512@2x.png 1>/dev/null
 
   rm -rf build/SingBox.app
   cp -rf build/meta/SingBox.app build
@@ -21,46 +23,21 @@ function buildMac() {
   iconutil -c icns icons.iconset -o build/SingBox.app/Contents/Resources/icon.icns
   rm -rf icons.iconset
 
-  env GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go build -tags with_clash_api -o build/SingBox.app/Contents/MacOS/sbox .
-  (cd build && zip -r SingBox-mac-amd64.zip SingBox.app)
+  env GOOS=darwin GOARCH=$1 $([ -n "$2" ] && echo GOAMD64=$2 || echo ) CGO_ENABLED=1 go build -tags with_clash_api -o build/SingBox.app/Contents/MacOS/sbox .
+  (cd build && zip -r SingBox-mac-${name}.zip SingBox.app 1>/dev/null)
   rm -rf build/SingBox.app
-  echo "macos app build success"
-}
-
-function buildMacM1() {
-  rm -rf icons.iconset
-  mkdir icons.iconset
-  sips -z 16 16     icon/logo.png --out icons.iconset/icon_16x16.png
-  sips -z 32 32     icon/logo.png --out icons.iconset/icon_16x16@2x.png
-  sips -z 32 32     icon/logo.png --out icons.iconset/icon_32x32.png
-  sips -z 64 64     icon/logo.png --out icons.iconset/icon_32x32@2x.png
-  sips -z 128 128   icon/logo.png --out icons.iconset/icon_128x128.png
-  sips -z 256 256   icon/logo.png --out icons.iconset/icon_128x128@2x.png
-  sips -z 256 256   icon/logo.png --out icons.iconset/icon_256x256.png
-  sips -z 512 512   icon/logo.png --out icons.iconset/icon_256x256@2x.png
-  sips -z 512 512   icon/logo.png --out icons.iconset/icon_512x512.png
-  sips -z 1024 1024 icon/logo.png --out icons.iconset/icon_512x512@2x.png
-
-  rm -rf build/SingBox.app
-  cp -rf build/meta/SingBox.app build
-
-  iconutil -c icns icons.iconset -o build/SingBox.app/Contents/Resources/icon.icns
-  rm -rf icons.iconset
-
-  env GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -tags with_clash_api -o build/SingBox.app/Contents/MacOS/sbox .
-  (cd build && zip -r SingBox-mac-arm64.zip SingBox.app)
-  rm -rf build/SingBox.app
-  echo "macos app build success"
+  echo "success !"
 }
 
 function buildWin() {
+    echo "start build win-amd64"
     rsrc -manifest build/meta/win/sbox.exe.manifest -ico icon/logo.ico -o sbox.exe.syso
     # brew info mingw-w64
     env GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC="x86_64-w64-mingw32-gcc" go build -tags with_clash_api -ldflags -H=windowsgui -o build/SingBox.exe ./
-    (cd build && zip -r SingBox-win-amd64.zip SingBox.exe)
+    (cd build && zip -r SingBox-win-amd64.zip SingBox.exe 1>/dev/null)
     rm sbox.exe.syso
     rm build/SingBox.exe
-  echo "win app build success"
+  echo "success !"
 }
 
 usage() { echo "Usage: $0 [-v string] [-p <string>]" 1>&2; exit 1; }
@@ -84,17 +61,19 @@ shift $((OPTIND-1))
 
 case "${p}" in
   mac)
-    buildMac
+    buildMac amd64
+    buildMac amd64 v3
   ;;
   m1)
-    buildMacM1
+    buildMac arm64
   ;;
   win)
-    buildWin
+    buildWin arm64
   ;;
   *)
-    buildMac
-    buildMacM1
+    buildMac amd64
+    buildMac amd64 v3
+    buildMac arm64
     buildWin
   ;;
 esac
