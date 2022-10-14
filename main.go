@@ -8,7 +8,6 @@ import (
 	"github.com/skratchdot/open-golang/open"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -79,7 +78,6 @@ func main() {
 }
 
 func onReady() {
-
 	_icon := icon
 	_iconOff := iconOff
 
@@ -103,6 +101,8 @@ func onReady() {
 		m.SetTitle("StopProxy")
 		systray.SetTemplateIcon(_icon, _icon)
 	}
+
+	var restartMenu *systray.MenuItem
 
 	startProxy := func(m *systray.MenuItem) {
 		if exist, err := fileExist(filepath.Join(ConfDir, "geoip.db")); err == nil && !exist {
@@ -139,12 +139,19 @@ func onReady() {
 		}
 		m.SetTitle("StopProxy")
 		systray.SetTemplateIcon(_icon, _icon)
+		if restartMenu != nil {
+			restartMenu.Show()
+		}
 	}
 
 	closeProxy := func(m *systray.MenuItem) {
 		sb.Close()
 		m.SetTitle("StartProxy")
 		systray.SetTemplateIcon(_iconOff, _iconOff)
+
+		if restartMenu != nil {
+			restartMenu.Hide()
+		}
 	}
 
 	proxyMenu := addMenu(&menu{
@@ -171,7 +178,7 @@ func onReady() {
 		startProxy(proxyMenu)
 	}
 
-	addMenu(&menu{
+	restartMenu = addMenu(&menu{
 		Title: "RestartProxy",
 		OnClick: func(m *systray.MenuItem) {
 			if sb.Running {
@@ -183,12 +190,9 @@ func onReady() {
 	})
 
 	addMenu(&menu{
-		Title: "EditConfig",
+		Title: "Dashboard",
 		OnClick: func(m *systray.MenuItem) {
-			_, err := exec.Command("code", Conf).Output()
-			if err != nil {
-				_ = open.Run(filepath.Join(home, ".singbox"))
-			}
+			_ = open.Run("http://yacd.metacubex.one")
 		},
 	})
 
@@ -250,9 +254,13 @@ func onReady() {
 	}, appConf.ProxyAtLogin)
 
 	addMenu(&menu{
-		Title: "Dashboard",
+		Title: "EditConfig",
 		OnClick: func(m *systray.MenuItem) {
-			_ = open.Run("http://yacd.metacubex.one")
+			confFile := filepath.Join(ConfDir, appConf.ActiveConfig)
+			err := open.RunWith(confFile, "Visual Studio Code")
+			if err != nil {
+				_ = open.Run(ConfDir)
+			}
 		},
 	})
 
@@ -323,18 +331,18 @@ func onExit() {
 func watcher(sb *SingBox, cb func(actType string)) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal(err)
+		notice2("file watcher err " + err.Error())
+		return
 	}
 	defer watcher.Close()
 
 	if files, err := dirFileList(ConfDir); err == nil {
 		for _, v := range files {
-			if strings.Contains(v, ".log") {
-				continue
-			}
-			err = watcher.Add(filepath.Join(ConfDir, v))
-			if err != nil {
-				fmt.Println(err)
+			if strings.Contains(v, ".json") {
+				err = watcher.Add(filepath.Join(ConfDir, v))
+				if err != nil {
+					notice2("file watcher err " + err.Error())
+				}
 			}
 		}
 	}

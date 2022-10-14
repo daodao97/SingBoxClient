@@ -79,12 +79,12 @@ func create(configPath string) (*box.Box, context.CancelFunc, error) {
 	instance, err := box.New(ctx, options)
 	if err != nil {
 		cancel()
-		return nil, nil, errors.Wrap(err, "create service")
+		return nil, nil, errors.Wrap(err, "sing-box core create service")
 	}
 	err = instance.Start()
 	if err != nil {
 		cancel()
-		return nil, nil, errors.Wrap(err, "start service")
+		return nil, nil, errors.Wrap(err, "sing-box core start service")
 	}
 	return instance, cancel, nil
 }
