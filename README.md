@@ -2,7 +2,12 @@
 
 Client for [sing-box](https://github.com/SagerNet/sing-box), support macos/win/linux, [download](https://github.com/daodao97/SingBox/releases)
 
-![](icon/example.png 'size:50%')
+<table>
+  <tr>
+    <td><img src="icon/example.png" width="300"/></td>
+    <td><img src="icon/win-example.png" width="280"/></td>
+  </tr>
+</table> 
 
 ## Usage
 

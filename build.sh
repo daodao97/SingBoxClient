@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+set -x
+
+export LDFLAGS="-L/usr/local/opt/openssl@3/lib"
+export CPPFLAGS="-I/usr/local/opt/openssl@3/include"
+
+gobuild="go build --tags with_quic,with_grpc,with_wireguard,with_shadowsocksr,with_ech,with_utls,with_acme,with_clash_api,with_gvisor"
 
 function buildMac() {
   name=$1$([ -n "$2" ] && echo -$2 || echo )
@@ -23,8 +29,10 @@ function buildMac() {
   iconutil -c icns icons.iconset -o build/SingBox.app/Contents/Resources/icon.icns
   rm -rf icons.iconset
 
-  env GOOS=darwin GOARCH=$1 $([ -n "$2" ] && echo GOAMD64=$2 || echo ) CGO_ENABLED=1 go build -tags with_clash_api -o build/SingBox.app/Contents/MacOS/sbox .
+  $(env GOOS=darwin GOARCH=$1 $([ -n "$2" ] && echo GOAMD64=$2 || echo ) CGO_ENABLED=1 $gobuild -o build/SingBox.app/Contents/MacOS/sbox .)
+
   (cd build && zip -r SingBox-mac-${name}.zip SingBox.app 1>/dev/null)
+
   rm -rf build/SingBox.app
   echo "success !"
 }
@@ -33,8 +41,10 @@ function buildWin() {
     echo "start build win-amd64"
     rsrc -manifest build/meta/win/sbox.exe.manifest -ico icon/logo.ico -o sbox.exe.syso
     # brew info mingw-w64
-    env GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC="x86_64-w64-mingw32-gcc" go build -tags with_clash_api -ldflags -H=windowsgui -o build/SingBox.exe ./
+    $(env GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC="x86_64-w64-mingw32-gcc" $gobuild -ldflags -H=windowsgui -o build/SingBox.exe ./)
+
     (cd build && zip -r SingBox-win-amd64.zip SingBox.exe 1>/dev/null)
+
     rm sbox.exe.syso
     rm build/SingBox.exe
   echo "success !"
