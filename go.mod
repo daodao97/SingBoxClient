@@ -57,7 +57,7 @@ require (
 	github.com/sagernet/quic-go v0.0.0-20221108053023-645bcc4f9b15 // indirect
 	github.com/sagernet/sing v0.0.0-20221008120626-60a9910eefe4 // indirect
 	github.com/sagernet/sing-dns v0.0.0-20221113031420-c6aaf2ea4b10 // indirect
-	github.com/sagernet/sing-shadowsocks v0.0.0-20220819002358-7461bb09a8f6 // indirect
+	github.com/sagernet/sing-shadowsocks v0.0.0-20221115140728-028358027bfa // indirect
 	github.com/sagernet/sing-tun v0.0.0-20221104121441-66c48a57776f // indirect
 	github.com/sagernet/sing-vmess v0.0.0-20221109021549-b446d5bdddf0 // indirect
 	github.com/sagernet/smux v0.0.0-20220831015742-e0f1988e3195 // indirect
