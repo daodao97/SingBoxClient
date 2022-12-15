@@ -55,10 +55,7 @@ func create(configPath string) (*box.Box, context.CancelFunc, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-
-	if options.Log == nil {
-		options.Log = &option.LogOptions{}
-	}
+	options.Experimental.ClashAPI.ExternalUI = filepath.Join(ConfDir, "ui")
 	options.Log.DisableColor = true
 	options.Log.Output = filepath.Join(ConfDir, "singbox.log")
 
@@ -104,5 +101,17 @@ func readConfig(configPath string) (option.Options, error) {
 	if err != nil {
 		return option.Options{}, errors.Wrap(err, "decode config")
 	}
+
+	if options.Log == nil {
+		options.Log = &option.LogOptions{}
+	}
+
+	if options.Experimental == nil {
+		options.Experimental = &option.ExperimentalOptions{}
+	}
+	if options.Experimental.ClashAPI == nil {
+		options.Experimental.ClashAPI = &option.ClashAPIOptions{}
+	}
+
 	return options, nil
 }

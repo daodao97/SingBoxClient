@@ -189,12 +189,16 @@ func onReady() {
 		},
 	})
 
-	addMenu(&menu{
-		Title: "Dashboard",
-		OnClick: func(m *systray.MenuItem) {
-			_ = open.Run("http://yacd.metacubex.one")
-		},
-	})
+	options, err := readConfig(filepath.Join(ConfDir, appConf.ActiveConfig))
+
+	if err == nil {
+		addMenu(&menu{
+			Title: "Dashboard",
+			OnClick: func(m *systray.MenuItem) {
+				_ = open.Run(fmt.Sprintf("http://%s/ui", options.Experimental.ClashAPI.ExternalController))
+			},
+		})
+	}
 
 	addCheckboxMenu(&menu{
 		Title: "LaunchdAtLogin",
