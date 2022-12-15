@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -x
 
+# go run --tags with_clash_api .
+
 export LDFLAGS="-L/usr/local/opt/openssl@3/lib"
 export CPPFLAGS="-I/usr/local/opt/openssl@3/include"
 
