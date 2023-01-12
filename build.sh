@@ -8,34 +8,39 @@ export CPPFLAGS="-I/usr/local/opt/openssl@3/include"
 
 gobuild="go build --tags with_quic,with_grpc,with_wireguard,with_shadowsocksr,with_ech,with_utls,with_acme,with_clash_api,with_gvisor"
 
-function buildMac() {
-  name=$1$([ -n "$2" ] && echo -$2 || echo )
-  echo "start build mac-${name}"
+function buildMacIcon() {
   rm -rf icons.iconset
   mkdir icons.iconset
   echo "build macos icons"
-  sips -z 16 16     icon/logo.png --out icons.iconset/icon_16x16.png      1>/dev/null
-  sips -z 32 32     icon/logo.png --out icons.iconset/icon_16x16@2x.png   1>/dev/null
-  sips -z 32 32     icon/logo.png --out icons.iconset/icon_32x32.png      1>/dev/null
-  sips -z 64 64     icon/logo.png --out icons.iconset/icon_32x32@2x.png   1>/dev/null
-  sips -z 128 128   icon/logo.png --out icons.iconset/icon_128x128.png    1>/dev/null
-  sips -z 256 256   icon/logo.png --out icons.iconset/icon_128x128@2x.png 1>/dev/null
-  sips -z 256 256   icon/logo.png --out icons.iconset/icon_256x256.png    1>/dev/null
-  sips -z 512 512   icon/logo.png --out icons.iconset/icon_256x256@2x.png 1>/dev/null
-  sips -z 512 512   icon/logo.png --out icons.iconset/icon_512x512.png    1>/dev/null
-  sips -z 1024 1024 icon/logo.png --out icons.iconset/icon_512x512@2x.png 1>/dev/null
+  sips -z 16 16     icon/logo.png --out icons.iconset/icon_16x16.png      
+  sips -z 32 32     icon/logo.png --out icons.iconset/icon_16x16@2x.png   
+  sips -z 32 32     icon/logo.png --out icons.iconset/icon_32x32.png      
+  sips -z 64 64     icon/logo.png --out icons.iconset/icon_32x32@2x.png   
+  sips -z 128 128   icon/logo.png --out icons.iconset/icon_128x128.png    
+  sips -z 256 256   icon/logo.png --out icons.iconset/icon_128x128@2x.png 
+  sips -z 256 256   icon/logo.png --out icons.iconset/icon_256x256.png    
+  sips -z 512 512   icon/logo.png --out icons.iconset/icon_256x256@2x.png 
+  sips -z 512 512   icon/logo.png --out icons.iconset/icon_512x512.png    
+  sips -z 1024 1024 icon/logo.png --out icons.iconset/icon_512x512@2x.png 
+  iconutil -c icns icons.iconset -o build/icon.icns
+}
 
+function buildMac() {
+  name=$1$([ -n "$2" ] && echo -$2 || echo )
+  echo "start build mac-${name}"
+ 
   rm -rf build/SingBox.app
   cp -rf build/meta/SingBox.app build
-
-  iconutil -c icns icons.iconset -o build/SingBox.app/Contents/Resources/icon.icns
-  rm -rf icons.iconset
+  mkdir -p build/SingBox.app/Contents/Resources 
+  cp -rf build/icon.icns build/SingBox.app/Contents/Resources/icon.icns
 
   $(env GOOS=darwin GOARCH=$1 $([ -n "$2" ] && echo GOAMD64=$2 || echo ) CGO_ENABLED=1 $gobuild -o build/SingBox.app/Contents/MacOS/sbox .)
 
   (cd build && zip -r SingBox-mac-${name}.zip SingBox.app 1>/dev/null)
 
   rm -rf build/SingBox.app
+  rm -rf icons.iconset
+  rm -rf build/icon.icns
   echo "success !"
 }
 
@@ -73,16 +78,22 @@ shift $((OPTIND-1))
 
 case "${p}" in
   mac)
+    buildMacIcon
     buildMac amd64
+  ;;
+  macV3)
+    buildMacIcon
     buildMac amd64 v3
   ;;
   m1)
+    buildMacIcon
     buildMac arm64
   ;;
   win)
     buildWin arm64
   ;;
   *)
+    buildMacIcon
     buildMac amd64
     buildMac amd64 v3
     buildMac arm64
