@@ -25,6 +25,11 @@ function buildMacIcon() {
   iconutil -c icns icons.iconset -o build/icon.icns
 }
 
+function macIconClear() {
+  rm -rf icons.iconset
+  rm -rf build/icon.icns
+}
+
 function buildMac() {
   name=$1$([ -n "$2" ] && echo -$2 || echo )
   echo "start build mac-${name}"
@@ -39,8 +44,6 @@ function buildMac() {
   (cd build && zip -r SingBox-mac-${name}.zip SingBox.app 1>/dev/null)
 
   rm -rf build/SingBox.app
-  rm -rf icons.iconset
-  rm -rf build/icon.icns
   echo "success !"
 }
 
@@ -80,14 +83,17 @@ case "${p}" in
   mac)
     buildMacIcon
     buildMac amd64
+    macIconClear
   ;;
   macV3)
     buildMacIcon
     buildMac amd64 v3
+    macIconClear
   ;;
   m1)
     buildMacIcon
     buildMac arm64
+    macIconClear
   ;;
   win)
     buildWin arm64
@@ -97,6 +103,7 @@ case "${p}" in
     buildMac amd64
     buildMac amd64 v3
     buildMac arm64
+    macIconClear
     buildWin
   ;;
 esac
