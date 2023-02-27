@@ -47,6 +47,7 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/mholt/acmez v1.1.0 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
+	github.com/nekohasekai/reality v0.0.0-20230225080858-d70c703b04cd // indirect
 	github.com/onsi/ginkgo/v2 v2.2.0 // indirect
 	github.com/oschwald/maxminddb-golang v1.10.0 // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
@@ -68,7 +69,7 @@ require (
 	github.com/sagernet/sing-vmess v0.1.2 // indirect
 	github.com/sagernet/smux v0.0.0-20220831015742-e0f1988e3195 // indirect
 	github.com/sagernet/tfo-go v0.0.0-20230207095944-549363a7327d // indirect
-	github.com/sagernet/utls v0.0.0-20230220130002-c08891932056 // indirect
+	github.com/sagernet/utls v0.0.0-20230225061716-536a007c8b01 // indirect
 	github.com/sagernet/websocket v0.0.0-20220913015213-615516348b4e // indirect
 	github.com/sagernet/wireguard-go v0.0.0-20221116151939-c99467f53f2c // indirect
 	github.com/spf13/cast v1.5.0 // indirect
