@@ -6,7 +6,7 @@ set -x
 export LDFLAGS="-L/usr/local/opt/openssl@3/lib"
 export CPPFLAGS="-I/usr/local/opt/openssl@3/include"
 
-gobuild="go build --tags with_quic,with_grpc,with_wireguard,with_shadowsocksr,with_ech,with_utls,with_acme,with_clash_api,with_gvisor"
+gobuild="go build -mod=vendor --tags with_quic,with_grpc,with_wireguard,with_shadowsocksr,with_ech,with_utls,with_acme,with_clash_api,with_gvisor"
 
 function buildMacIcon() {
   rm -rf icons.iconset
@@ -57,7 +57,13 @@ function buildWin() {
 
     rm sbox.exe.syso
     rm build/SingBox.exe
-  echo "success !"
+    echo "success !"
+}
+
+function buildLinux() {
+  name=$1$([ -n "$2" ] && echo -$2 || echo )
+  echo "start build linux-${name}"
+  $(env GOOS=linux GOARCH=$1 $([ -n "$2" ] && echo GOAMD64=$2 || echo ) CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ CGO_ENABLED=1 $gobuild .)
 }
 
 usage() { echo "Usage: $0 [-v string] [-p <string>]" 1>&2; exit 1; }
@@ -97,6 +103,9 @@ case "${p}" in
   ;;
   win)
     buildWin arm64
+  ;;
+  linux)
+    buildLinux amd64
   ;;
   *)
     buildMacIcon

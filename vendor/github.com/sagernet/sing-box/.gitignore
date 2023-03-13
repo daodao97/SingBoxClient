@@ -1,0 +1,13 @@
+/.idea/
+/vendor/
+/*.json
+/*.db
+/site/
+/bin/
+/dist/
+/sing-box
+/build/
+/*.jar
+/*.aar
+/*.xcframework/
+.DS_Store
