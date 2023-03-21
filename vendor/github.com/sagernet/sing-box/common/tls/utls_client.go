@@ -5,6 +5,7 @@ package tls
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"math/rand"
 	"net"
 	"net/netip"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"github.com/sagernet/sing-box/option"
 	E "github.com/sagernet/sing/common/exceptions"
 	utls "github.com/sagernet/utls"
+
+	"golang.org/x/net/http2"
 )
 
 type UTLSClientConfig struct {
@@ -33,6 +36,9 @@ func (e *UTLSClientConfig) NextProtos() []string {
 }
 
 func (e *UTLSClientConfig) SetNextProtos(nextProto []string) {
+	if len(nextProto) == 1 && nextProto[0] == http2.NextProtoTLS {
+		nextProto = append(nextProto, "http/1.1")
+	}
 	e.config.NextProtos = nextProto
 }
 
@@ -159,6 +165,29 @@ func NewUTLSClient(router adapter.Router, serverAddress string, options option.O
 	return &UTLSClientConfig{&tlsConfig, id}, nil
 }
 
+var (
+	randomFingerprint     utls.ClientHelloID
+	randomizedFingerprint utls.ClientHelloID
+)
+
+func init() {
+	modernFingerprints := []utls.ClientHelloID{
+		utls.HelloChrome_Auto,
+		utls.HelloFirefox_Auto,
+		utls.HelloEdge_Auto,
+		utls.HelloSafari_Auto,
+		utls.HelloIOS_Auto,
+	}
+	randomFingerprint = modernFingerprints[rand.Intn(len(modernFingerprints))]
+
+	weights := utls.DefaultWeights
+	weights.TLSVersMax_Set_VersionTLS13 = 1
+	weights.FirstKeyShare_Set_CurveP256 = 0
+	randomizedFingerprint = utls.HelloRandomized
+	randomizedFingerprint.Seed, _ = utls.NewPRNGSeed()
+	randomizedFingerprint.Weights = &weights
+}
+
 func uTLSClientHelloID(name string) (utls.ClientHelloID, error) {
 	switch name {
 	case "chrome", "":
@@ -178,7 +207,9 @@ func uTLSClientHelloID(name string) (utls.ClientHelloID, error) {
 	case "android":
 		return utls.HelloAndroid_11_OkHttp, nil
 	case "random":
-		return utls.HelloRandomized, nil
+		return randomFingerprint, nil
+	case "randomized":
+		return randomizedFingerprint, nil
 	default:
 		return utls.ClientHelloID{}, E.New("unknown uTLS fingerprint: ", name)
 	}

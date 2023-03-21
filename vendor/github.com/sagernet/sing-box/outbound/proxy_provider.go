@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/convert"
 	"github.com/sagernet/sing-box/common/json"
@@ -95,9 +96,10 @@ func NewProvider(router adapter.Router, logger log.ContextLogger, tag string, op
 	}
 
 	if outbound.providerType == "url" && len(outbound.path) == 0 {
-		pwd, _ := os.UserHomeDir()
 		for _, v := range outbound.url {
-			outbound.path = append(outbound.path, filepath.Join(pwd, ".singbox", "provider", tag+"_"+md5V(v)))
+			providerPath := filepath.Join(C.BasePath(""), "provider", tag+"_"+md5V(v))
+			fmt.Println(1111, providerPath)
+			outbound.path = append(outbound.path, providerPath)
 		}
 	}
 

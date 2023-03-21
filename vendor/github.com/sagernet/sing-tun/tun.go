@@ -46,6 +46,7 @@ type Options struct {
 	ExcludePackage     []string
 	InterfaceMonitor   DefaultInterfaceMonitor
 	TableIndex         int
+	FileDescriptor     int
 }
 
 func CalculateInterfaceName(name string) (tunName string) {

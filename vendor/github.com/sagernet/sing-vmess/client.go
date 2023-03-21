@@ -161,6 +161,10 @@ func (c *Client) dialRaw(upstream net.Conn, command byte, destination M.Socksadd
 	return conn
 }
 
+func (c *rawClientConn) NeedHandshake() bool {
+	return c.writer == nil
+}
+
 func (c *rawClientConn) writeHandshake(payload []byte) error {
 	paddingLen := mRand.Intn(16)
 

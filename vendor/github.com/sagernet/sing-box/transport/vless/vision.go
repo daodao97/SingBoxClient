@@ -16,6 +16,7 @@ import (
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
 	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/sagernet/sing/common/logger"
 	N "github.com/sagernet/sing/common/network"
 )
 
@@ -31,32 +32,36 @@ func init() {
 	})
 }
 
+const xrayChunkSize = 8192
+
 type VisionConn struct {
 	net.Conn
+	reader   *bufio.ChunkReader
 	writer   N.VectorisedWriter
 	input    *bytes.Reader
 	rawInput *bytes.Buffer
 	netConn  net.Conn
+	logger   logger.Logger
 
-	userUUID                 [16]byte
-	isTLS                    bool
-	numberOfPacketToFilter   int
-	isTLS12orAbove           bool
-	remainingServerHello     int32
-	cipher                   uint16
-	enableXTLS               bool
-	filterTlsApplicationData bool
-	directWrite              bool
-	writeUUID                bool
-	filterUUID               bool
-	remainingContent         int
-	remainingPadding         int
-	currentCommand           int
-	directRead               bool
-	remainingReader          io.Reader
+	userUUID               [16]byte
+	isTLS                  bool
+	numberOfPacketToFilter int
+	isTLS12orAbove         bool
+	remainingServerHello   int32
+	cipher                 uint16
+	enableXTLS             bool
+	isPadding              bool
+	directWrite            bool
+	writeUUID              bool
+	withinPaddingBuffers   bool
+	remainingContent       int
+	remainingPadding       int
+	currentCommand         int
+	directRead             bool
+	remainingReader        io.Reader
 }
 
-func NewVisionConn(conn net.Conn, userUUID [16]byte) (*VisionConn, error) {
+func NewVisionConn(conn net.Conn, userUUID [16]byte, logger logger.Logger) (*VisionConn, error) {
 	var (
 		loaded         bool
 		reflectType    reflect.Type
@@ -75,19 +80,22 @@ func NewVisionConn(conn net.Conn, userUUID [16]byte) (*VisionConn, error) {
 	input, _ := reflectType.FieldByName("input")
 	rawInput, _ := reflectType.FieldByName("rawInput")
 	return &VisionConn{
-		Conn:                     conn,
-		writer:                   bufio.NewVectorisedWriter(conn),
-		input:                    (*bytes.Reader)(unsafe.Pointer(reflectPointer + input.Offset)),
-		rawInput:                 (*bytes.Buffer)(unsafe.Pointer(reflectPointer + rawInput.Offset)),
-		netConn:                  netConn,
-		userUUID:                 userUUID,
-		numberOfPacketToFilter:   8,
-		remainingServerHello:     -1,
-		filterTlsApplicationData: true,
-		writeUUID:                true,
-		filterUUID:               true,
-		remainingContent:         -1,
-		remainingPadding:         -1,
+		Conn:     conn,
+		reader:   bufio.NewChunkReader(conn, xrayChunkSize),
+		writer:   bufio.NewVectorisedWriter(conn),
+		input:    (*bytes.Reader)(unsafe.Pointer(reflectPointer + input.Offset)),
+		rawInput: (*bytes.Buffer)(unsafe.Pointer(reflectPointer + rawInput.Offset)),
+		netConn:  netConn,
+		logger:   logger,
+
+		userUUID:               userUUID,
+		numberOfPacketToFilter: 8,
+		remainingServerHello:   -1,
+		isPadding:              true,
+		writeUUID:              true,
+		withinPaddingBuffers:   true,
+		remainingContent:       -1,
+		remainingPadding:       -1,
 	}, nil
 }
 
@@ -96,26 +104,38 @@ func (c *VisionConn) Read(p []byte) (n int, err error) {
 		n, err = c.remainingReader.Read(p)
 		if err == io.EOF {
 			c.remainingReader = nil
-			if n > 0 {
-				return
-			}
+		}
+		if n > 0 {
+			return
 		}
 	}
 	if c.directRead {
 		return c.netConn.Read(p)
 	}
-	n, err = c.Conn.Read(p)
-	if err != nil {
-		return
+	var bufferBytes []byte
+	if len(p) > xrayChunkSize {
+		n, err = c.Conn.Read(p)
+		if err != nil {
+			return
+		}
+		bufferBytes = p[:n]
+	} else {
+		buffer, err := c.reader.ReadChunk()
+		if err != nil {
+			return 0, err
+		}
+		defer buffer.FullReset()
+		bufferBytes = buffer.Bytes()
 	}
-	buffer := p[:n]
-	if c.filterUUID && (c.isTLS || c.numberOfPacketToFilter > 0) {
-		buffers := c.unPadding(buffer)
+	if c.withinPaddingBuffers || c.numberOfPacketToFilter > 0 {
+		buffers := c.unPadding(bufferBytes)
 		if c.remainingContent == 0 && c.remainingPadding == 0 {
 			if c.currentCommand == 1 {
-				c.filterUUID = false
+				c.withinPaddingBuffers = false
+				c.remainingContent = -1
+				c.remainingPadding = -1
 			} else if c.currentCommand == 2 {
-				c.filterUUID = false
+				c.withinPaddingBuffers = false
 				c.directRead = true
 
 				inputBuffer, err := io.ReadAll(c.input)
@@ -130,18 +150,26 @@ func (c *VisionConn) Read(p []byte) (n int, err error) {
 				}
 
 				buffers = append(buffers, rawInputBuffer)
-			} else if c.currentCommand != 0 {
+
+				c.logger.Trace("XtlsRead readV")
+			} else if c.currentCommand == 0 {
+				c.withinPaddingBuffers = true
+			} else {
 				return 0, E.New("unknown command ", c.currentCommand)
 			}
+		} else if c.remainingContent > 0 || c.remainingPadding > 0 {
+			c.withinPaddingBuffers = true
+		} else {
+			c.withinPaddingBuffers = false
 		}
 		if c.numberOfPacketToFilter > 0 {
 			c.filterTLS(buffers)
 		}
 		c.remainingReader = io.MultiReader(common.Map(buffers, func(it []byte) io.Reader { return bytes.NewReader(it) })...)
-		return c.remainingReader.Read(p)
+		return c.Read(p)
 	} else {
 		if c.numberOfPacketToFilter > 0 {
-			c.filterTLS([][]byte{buffer})
+			c.filterTLS([][]byte{bufferBytes})
 		}
 		return
 	}
@@ -151,27 +179,27 @@ func (c *VisionConn) Write(p []byte) (n int, err error) {
 	if c.numberOfPacketToFilter > 0 {
 		c.filterTLS([][]byte{p})
 	}
-	if c.isTLS && c.filterTlsApplicationData {
+	if c.isPadding {
 		inputLen := len(p)
 		buffers := reshapeBuffer(p)
 		var specIndex int
 		for i, buffer := range buffers {
-			if buffer.Len() > 6 && bytes.Equal(tlsApplicationDataStart, buffer.To(3)) {
-				var command byte = 1
+			if c.isTLS && buffer.Len() > 6 && bytes.Equal(tlsApplicationDataStart, buffer.To(3)) {
+				var command byte = commandPaddingEnd
 				if c.enableXTLS {
 					c.directWrite = true
 					specIndex = i
-					command = 2
+					command = commandPaddingDirect
 				}
-				c.filterTlsApplicationData = false
+				c.isPadding = false
 				buffers[i] = c.padding(buffer, command)
 				break
-			} else if !c.isTLS12orAbove && c.numberOfPacketToFilter == 0 {
-				c.filterTlsApplicationData = false
-				buffers[i] = c.padding(buffer, 0x01)
+			} else if !c.isTLS12orAbove && c.numberOfPacketToFilter <= 1 {
+				c.isPadding = false
+				buffers[i] = c.padding(buffer, commandPaddingEnd)
 				break
 			}
-			buffers[i] = c.padding(buffer, 0x00)
+			buffers[i] = c.padding(buffer, commandPaddingContinue)
 		}
 		if c.directWrite {
 			encryptedBuffer := buffers[:specIndex+1]
@@ -181,6 +209,7 @@ func (c *VisionConn) Write(p []byte) (n int, err error) {
 			}
 			buffers = buffers[specIndex+1:]
 			c.writer = bufio.NewVectorisedWriter(c.netConn)
+			c.logger.Trace("XtlsWrite writeV ", specIndex, " ", buf.LenMulti(encryptedBuffer), " ", len(buffers))
 			time.Sleep(5 * time.Millisecond) // wtf
 		}
 		err = c.writer.WriteVectorised(buffers)
@@ -209,10 +238,13 @@ func (c *VisionConn) filterTLS(buffers [][]byte) {
 						sessionIdLen := int32(buffer[43])
 						cipherSuite := buffer[43+sessionIdLen+1 : 43+sessionIdLen+3]
 						c.cipher = uint16(cipherSuite[0])<<8 | uint16(cipherSuite[1])
+					} else {
+						c.logger.Trace("XtlsFilterTls short server hello, tls 1.2 or older? ", len(buffer), " ", c.remainingServerHello)
 					}
 				}
 			} else if bytes.Equal(tlsClientHandShakeStart, buffer[:2]) && buffer[5] == 1 {
 				c.isTLS = true
+				c.logger.Trace("XtlsFilterTls found tls client hello! ", len(buffer))
 			}
 		}
 		if c.remainingServerHello > 0 {
@@ -226,12 +258,17 @@ func (c *VisionConn) filterTLS(buffers [][]byte) {
 				if ok && cipher != "TLS_AES_128_CCM_8_SHA256" {
 					c.enableXTLS = true
 				}
+				c.logger.Trace("XtlsFilterTls found tls 1.3! ", len(buffer), " ", c.cipher, " ", c.enableXTLS)
 				c.numberOfPacketToFilter = 0
 				return
 			} else if c.remainingServerHello == 0 {
+				c.logger.Trace("XtlsFilterTls found tls 1.2! ", len(buffer))
 				c.numberOfPacketToFilter = 0
 				return
 			}
+		}
+		if c.numberOfPacketToFilter == 0 {
+			c.logger.Trace("XtlsFilterTls stop filtering ", len(buffer))
 		}
 	}
 }
@@ -242,21 +279,34 @@ func (c *VisionConn) padding(buffer *buf.Buffer, command byte) *buf.Buffer {
 	if buffer != nil {
 		contentLen = buffer.Len()
 	}
-	if contentLen < 900 {
+	if contentLen < 900 && c.isTLS {
 		l, _ := rand.Int(rand.Reader, big.NewInt(500))
 		paddingLen = int(l.Int64()) + 900 - contentLen
+	} else {
+		l, _ := rand.Int(rand.Reader, big.NewInt(256))
+		paddingLen = int(l.Int64())
 	}
-	newBuffer := buf.New()
+	var bufferLen int
 	if c.writeUUID {
-		newBuffer.Write(c.userUUID[:])
+		bufferLen += 16
+	}
+	bufferLen += 5
+	if buffer != nil {
+		bufferLen += buffer.Len()
+	}
+	bufferLen += paddingLen
+	newBuffer := buf.NewSize(bufferLen)
+	if c.writeUUID {
+		common.Must1(newBuffer.Write(c.userUUID[:]))
 		c.writeUUID = false
 	}
-	newBuffer.Write([]byte{command, byte(contentLen >> 8), byte(contentLen), byte(paddingLen >> 8), byte(paddingLen)})
+	common.Must1(newBuffer.Write([]byte{command, byte(contentLen >> 8), byte(contentLen), byte(paddingLen >> 8), byte(paddingLen)}))
 	if buffer != nil {
-		newBuffer.Write(buffer.Bytes())
+		common.Must1(newBuffer.Write(buffer.Bytes()))
 		buffer.Release()
 	}
 	newBuffer.Extend(paddingLen)
+	c.logger.Trace("XtlsPadding ", contentLen, " ", paddingLen, " ", command)
 	return newBuffer
 }
 
@@ -267,6 +317,7 @@ func (c *VisionConn) unPadding(buffer []byte) [][]byte {
 			bufferIndex = 16
 			c.remainingContent = 0
 			c.remainingPadding = 0
+			c.currentCommand = 0
 		}
 	}
 	if c.remainingContent == -1 && c.remainingPadding == -1 {
@@ -284,6 +335,7 @@ func (c *VisionConn) unPadding(buffer []byte) [][]byte {
 				c.remainingContent = int(paddingInfo[1])<<8 | int(paddingInfo[2])
 				c.remainingPadding = int(paddingInfo[3])<<8 | int(paddingInfo[4])
 				bufferIndex += 5
+				c.logger.Trace("Xtls Unpadding new block ", bufferIndex, " ", c.remainingContent, " padding ", c.remainingPadding, " ", c.currentCommand)
 			}
 		} else if c.remainingContent > 0 {
 			end := c.remainingContent
@@ -306,4 +358,8 @@ func (c *VisionConn) unPadding(buffer []byte) [][]byte {
 		}
 	}
 	return buffers
+}
+
+func (c *VisionConn) Upstream() any {
+	return c.Conn
 }

@@ -90,7 +90,7 @@ func onReady() {
 	sb = &SingBox{ConfPath: Conf}
 
 	_startProxy := func(m *systray.MenuItem) {
-		err := sb.Start(filepath.Join(ConfDir, appConf.ActiveConfig))
+		err := sb.Start(ConfDir, appConf.ActiveConfig)
 		if err != nil {
 			notice(&notify.Notification{
 				Title:   "SingBox Start error",
@@ -111,7 +111,7 @@ func onReady() {
 				Message: "Initializing the environment and the system will boot later",
 			})
 		}
-		err := sb.Start(filepath.Join(ConfDir, appConf.ActiveConfig))
+		err := sb.Start(ConfDir, appConf.ActiveConfig)
 		if err != nil {
 			if strings.Contains(err.Error(), "configure tun interface") {
 				if strings.Contains(err.Error(), "Access is denied") {

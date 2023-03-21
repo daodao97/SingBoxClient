@@ -117,6 +117,40 @@ func dialTFO(ctx context.Context, network string, laddr, raddr *net.TCPAddr, b [
 	return tcpConn, nil
 }
 
+func connect(rawConn syscall.RawConn, rsa syscall.Sockaddr, b []byte) (n int, err error) {
+	var done bool
+
+	if perr := rawConn.Write(func(fd uintptr) bool {
+		if done {
+			return true
+		}
+
+		n, err = doConnect(fd, rsa, b)
+		switch err {
+		case unix.EINPROGRESS, unix.EINTR:
+			done = true
+			err = nil
+			return false
+		default:
+			return true
+		}
+	}); perr != nil {
+		return 0, perr
+	}
+
+	if err != nil {
+		return 0, wrapSyscallError(connectSyscallName, err)
+	}
+
+	if perr := rawConn.Control(func(fd uintptr) {
+		err = getSocketError(int(fd), connectSyscallName)
+	}); perr != nil {
+		return 0, perr
+	}
+
+	return
+}
+
 func getSocketError(fd int, call string) error {
 	nerr, err := unix.GetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_ERROR)
 	if err != nil {

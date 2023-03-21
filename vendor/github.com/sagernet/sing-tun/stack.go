@@ -24,6 +24,7 @@ type StackOptions struct {
 	UDPTimeout             int64
 	Handler                Handler
 	Logger                 logger.Logger
+	UnderPlatform          bool
 }
 
 func NewStack(
@@ -32,7 +33,7 @@ func NewStack(
 ) (Stack, error) {
 	switch stack {
 	case "":
-		return NewSystem(options)
+		return defaultStack(options)
 	case "gvisor":
 		return NewGVisor(options)
 	case "system":

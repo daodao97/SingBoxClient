@@ -11,11 +11,7 @@ import (
 	E "github.com/sagernet/sing/common/exceptions"
 )
 
-const (
-	ReversedHeader = 1024
-	BufferSize     = 32 * 1024
-	UDPBufferSize  = 16 * 1024
-)
+const ReversedHeader = 1024
 
 type Buffer struct {
 	data    []byte

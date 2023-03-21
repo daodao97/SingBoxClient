@@ -28,23 +28,29 @@ type NativeTun struct {
 	inet6Address string
 }
 
-func Open(options Options) (Tun, error) {
-	ifIndex := -1
-	_, err := fmt.Sscanf(options.Name, "utun%d", &ifIndex)
-	if err != nil {
-		return nil, E.New("bad tun name: ", options.Name)
+func New(options Options) (Tun, error) {
+	var tunFd int
+	if options.FileDescriptor == 0 {
+		ifIndex := -1
+		_, err := fmt.Sscanf(options.Name, "utun%d", &ifIndex)
+		if err != nil {
+			return nil, E.New("bad tun name: ", options.Name)
+		}
+
+		tunFd, err = unix.Socket(unix.AF_SYSTEM, unix.SOCK_DGRAM, 2)
+		if err != nil {
+			return nil, err
+		}
+
+		err = configure(tunFd, ifIndex, options.Name, options)
+		if err != nil {
+			unix.Close(tunFd)
+			return nil, err
+		}
+	} else {
+		tunFd = options.FileDescriptor
 	}
 
-	tunFd, err := unix.Socket(unix.AF_SYSTEM, unix.SOCK_DGRAM, 2)
-	if err != nil {
-		return nil, err
-	}
-
-	err = configure(tunFd, ifIndex, options.Name, options)
-	if err != nil {
-		unix.Close(tunFd)
-		return nil, err
-	}
 	nativeTun := &NativeTun{
 		tunFile: os.NewFile(uintptr(tunFd), "utun"),
 		mtu:     options.MTU,

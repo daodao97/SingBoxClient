@@ -36,7 +36,11 @@ func (m *Map[K, V]) ContainsKey(key K) bool {
 func (m *Map[K, V]) Get(key K) (V, bool) {
 	m.init()
 	value, loaded := m.rawMap[key]
-	return value.Value.Value, loaded
+	if loaded {
+		return value.Value.Value, true
+	} else {
+		return common.DefaultValue[V](), false
+	}
 }
 
 func (m *Map[K, V]) Put(key K, value V) V {

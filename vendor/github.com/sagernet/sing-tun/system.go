@@ -194,7 +194,7 @@ func (s *System) acceptLoop(listener net.Listener) {
 			}
 		}
 		go func() {
-			s.handler.NewConnection(context.Background(), conn, M.Metadata{
+			s.handler.NewConnection(s.ctx, conn, M.Metadata{
 				Source:      M.SocksaddrFromNetIP(session.Source),
 				Destination: destination,
 			})

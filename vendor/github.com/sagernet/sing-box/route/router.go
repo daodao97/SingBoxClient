@@ -169,6 +169,9 @@ func NewRouter(
 		} else {
 			tag = F.ToString(i)
 		}
+		if transportTagMap[tag] {
+			return nil, E.New("duplicate dns server tag: ", tag)
+		}
 		transportTags[i] = tag
 		transportTagMap[tag] = true
 	}
@@ -241,6 +244,9 @@ func NewRouter(
 		}), func(index int, server option.DNSServerOptions) string {
 			return transportTags[index]
 		})
+		if len(unresolvedTags) == 0 {
+			panic(F.ToString("unexpected unresolved dns servers: ", len(transports), " ", len(dummyTransportMap), " ", len(transportMap)))
+		}
 		return nil, E.New("found circular reference in dns servers: ", strings.Join(unresolvedTags, " "))
 	}
 	var defaultTransport dns.Transport
@@ -582,10 +588,24 @@ func (r *Router) RouteConnection(ctx context.Context, conn net.Conn, metadata ad
 	case vmess.MuxDestination.Fqdn:
 		r.logger.InfoContext(ctx, "inbound legacy multiplex connection")
 		return vmess.HandleMuxConnection(ctx, conn, adapter.NewUpstreamHandler(metadata, r.RouteConnection, r.RoutePacketConnection, r))
-	case uot.UOTMagicAddress:
-		r.logger.InfoContext(ctx, "inbound UoT connection")
-		metadata.Destination = M.Socksaddr{}
-		return r.RoutePacketConnection(ctx, uot.NewClientConn(conn), metadata)
+	case uot.MagicAddress:
+		request, err := uot.ReadRequest(conn)
+		if err != nil {
+			return E.Cause(err, "read UoT request")
+		}
+		if request.IsConnect {
+			r.logger.InfoContext(ctx, "inbound UoT connect connection to ", request.Destination)
+		} else {
+			r.logger.InfoContext(ctx, "inbound UoT connection to ", request.Destination)
+		}
+		metadata.Domain = metadata.Destination.Fqdn
+		metadata.Destination = request.Destination
+		return r.RoutePacketConnection(ctx, uot.NewConn(conn, *request), metadata)
+	case uot.LegacyMagicAddress:
+		r.logger.InfoContext(ctx, "inbound legacy UoT connection")
+		metadata.Domain = metadata.Destination.Fqdn
+		metadata.Destination = M.Socksaddr{Addr: netip.IPv4Unspecified()}
+		return r.RoutePacketConnection(ctx, uot.NewConn(conn, uot.Request{}), metadata)
 	}
 	if metadata.InboundOptions.SniffEnabled {
 		buffer := buf.NewPacket()
@@ -690,7 +710,7 @@ func (r *Router) RoutePacketConnection(ctx context.Context, conn N.PacketConn, m
 		}
 		conn = bufio.NewCachedPacketConn(conn, buffer, destination)
 	}
-	if metadata.Destination.IsFqdn() && metadata.Destination.Fqdn != uot.UOTMagicAddress && dns.DomainStrategy(metadata.InboundOptions.DomainStrategy) != dns.DomainStrategyAsIS {
+	if metadata.Destination.IsFqdn() && dns.DomainStrategy(metadata.InboundOptions.DomainStrategy) != dns.DomainStrategyAsIS {
 		addresses, err := r.Lookup(adapter.WithContext(ctx, &metadata), metadata.Destination.Fqdn, dns.DomainStrategy(metadata.InboundOptions.DomainStrategy))
 		if err != nil {
 			return err
@@ -903,10 +923,9 @@ func (r *Router) prepareGeoIPDatabase() error {
 		geoPath = "geoip.db"
 		if foundPath, loaded := C.FindPath(geoPath); loaded {
 			geoPath = foundPath
-		} else {
-			geoPath = C.BasePath(geoPath)
 		}
 	}
+	geoPath = C.BasePath(geoPath)
 	if !rw.FileExists(geoPath) {
 		r.logger.Warn("geoip database not exists: ", geoPath)
 		var err error
@@ -940,10 +959,9 @@ func (r *Router) prepareGeositeDatabase() error {
 		geoPath = "geosite.db"
 		if foundPath, loaded := C.FindPath(geoPath); loaded {
 			geoPath = foundPath
-		} else {
-			geoPath = C.BasePath(geoPath)
 		}
 	}
+	geoPath = C.BasePath(geoPath)
 	if !rw.FileExists(geoPath) {
 		r.logger.Warn("geosite database not exists: ", geoPath)
 		var err error

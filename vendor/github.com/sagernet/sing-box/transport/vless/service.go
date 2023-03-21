@@ -11,15 +11,18 @@ import (
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
 	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/sagernet/sing/common/logger"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 
 	"github.com/gofrs/uuid"
 )
 
-type Service[T any] struct {
-	userMap map[[16]byte]T
-	handler Handler
+type Service[T comparable] struct {
+	userMap  map[[16]byte]T
+	userFlow map[T]string
+	logger   logger.Logger
+	handler  Handler
 }
 
 type Handler interface {
@@ -28,22 +31,26 @@ type Handler interface {
 	E.Handler
 }
 
-func NewService[T any](handler Handler) *Service[T] {
+func NewService[T comparable](logger logger.Logger, handler Handler) *Service[T] {
 	return &Service[T]{
+		logger:  logger,
 		handler: handler,
 	}
 }
 
-func (s *Service[T]) UpdateUsers(userList []T, userUUIDList []string) {
+func (s *Service[T]) UpdateUsers(userList []T, userUUIDList []string, userFlowList []string) {
 	userMap := make(map[[16]byte]T)
+	userFlowMap := make(map[T]string)
 	for i, userName := range userList {
 		userID := uuid.FromStringOrNil(userUUIDList[i])
 		if userID == uuid.Nil {
 			userID = uuid.NewV5(uuid.Nil, userUUIDList[i])
 		}
 		userMap[userID] = userName
+		userFlowMap[userName] = userFlowList[i]
 	}
 	s.userMap = userMap
+	s.userFlow = userFlowMap
 }
 
 var _ N.TCPConnectionHandler = (*Service[int])(nil)
@@ -60,26 +67,41 @@ func (s *Service[T]) NewConnection(ctx context.Context, conn net.Conn, metadata 
 	ctx = auth.ContextWithUser(ctx, user)
 	metadata.Destination = request.Destination
 
-	protocolConn := conn
-	switch request.Flow {
-	case "":
-	case FlowVision:
-		protocolConn, err = NewVisionConn(conn, request.UUID)
-		if err != nil {
-			return E.Cause(err, "initialize vision")
+	userFlow := s.userFlow[user]
+
+	var responseWriter io.Writer
+	if request.Command == vmess.CommandTCP {
+		if request.Flow != userFlow {
+			return E.New("flow mismatch: expected ", flowName(userFlow), ", but got ", flowName(request.Flow))
+		}
+		switch userFlow {
+		case "":
+		case FlowVision:
+			responseWriter = conn
+			conn, err = NewVisionConn(conn, request.UUID, s.logger)
+			if err != nil {
+				return E.Cause(err, "initialize vision")
+			}
 		}
 	}
 
 	switch request.Command {
 	case vmess.CommandTCP:
-		return s.handler.NewConnection(ctx, &serverConn{Conn: protocolConn, responseWriter: conn}, metadata)
+		return s.handler.NewConnection(ctx, &serverConn{Conn: conn, responseWriter: responseWriter}, metadata)
 	case vmess.CommandUDP:
 		return s.handler.NewPacketConnection(ctx, &serverPacketConn{ExtendedConn: bufio.NewExtendedConn(conn), destination: request.Destination}, metadata)
 	case vmess.CommandMux:
-		return vmess.HandleMuxConnection(ctx, &serverConn{Conn: conn}, s.handler)
+		return vmess.HandleMuxConnection(ctx, &serverConn{Conn: conn, responseWriter: responseWriter}, s.handler)
 	default:
 		return E.New("unknown command: ", request.Command)
 	}
+}
+
+func flowName(value string) string {
+	if value == "" {
+		return "none"
+	}
+	return value
 }
 
 type serverConn struct {

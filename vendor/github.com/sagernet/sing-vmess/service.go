@@ -294,8 +294,12 @@ func (s *Service[U]) NewConnection(ctx context.Context, conn net.Conn, metadata 
 		return E.Extend(ErrBadVersion, version)
 	}
 
-	requestBodyKey := headerBuffer[17:33]
-	requestBodyNonce := headerBuffer[1:17]
+	requestBodyKey := make([]byte, 16)
+	requestBodyNonce := make([]byte, 16)
+
+	copy(requestBodyKey, headerBuffer[17:33])
+	copy(requestBodyNonce, headerBuffer[1:17])
+
 	responseHeader := headerBuffer[33]
 	option := headerBuffer[34]
 	paddingLen := int(headerBuffer[35] >> 4)
@@ -434,6 +438,10 @@ func (c *rawServerConn) RearHeadroom() int {
 
 func (c *rawServerConn) Upstream() any {
 	return c.Conn
+}
+
+func (c *rawServerConn) NeedHandshake() bool {
+	return c.writer == nil
 }
 
 type serverConn struct {

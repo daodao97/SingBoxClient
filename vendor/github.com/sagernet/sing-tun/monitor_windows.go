@@ -67,6 +67,10 @@ func (m *defaultInterfaceMonitor) checkUpdate() error {
 	var index int
 
 	for _, row := range rows {
+		if row.DestinationPrefix.PrefixLength != 0 {
+			continue
+		}
+
 		ifrow, err := row.InterfaceLUID.Interface()
 		if err != nil || ifrow.OperStatus != winipcfg.IfOperStatusUp {
 			continue

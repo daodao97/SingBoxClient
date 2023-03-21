@@ -29,7 +29,7 @@ type Shadowsocks struct {
 	method          shadowsocks.Method
 	serverAddr      M.Socksaddr
 	plugin          sip003.Plugin
-	uot             bool
+	uotClient       *uot.Client
 	multiplexDialer N.Dialer
 }
 
@@ -49,7 +49,6 @@ func NewShadowsocks(ctx context.Context, router adapter.Router, logger log.Conte
 		dialer:     dialer.New(router, options.DialerOptions),
 		method:     method,
 		serverAddr: options.ServerOptions.Build(),
-		uot:        options.UoT,
 	}
 	if options.Plugin != "" {
 		outbound.plugin, err = sip003.CreatePlugin(options.Plugin, options.PluginOptions, router, outbound.dialer, outbound.serverAddr)
@@ -57,10 +56,17 @@ func NewShadowsocks(ctx context.Context, router adapter.Router, logger log.Conte
 			return nil, err
 		}
 	}
-	if !options.UoT {
+	uotOptions := common.PtrValueOrDefault(options.UDPOverTCPOptions)
+	if !uotOptions.Enabled {
 		outbound.multiplexDialer, err = mux.NewClientWithOptions(ctx, (*shadowsocksDialer)(outbound), common.PtrValueOrDefault(options.MultiplexOptions))
 		if err != nil {
 			return nil, err
+		}
+	}
+	if uotOptions.Enabled {
+		outbound.uotClient = &uot.Client{
+			Dialer:  (*shadowsocksDialer)(outbound),
+			Version: uotOptions.Version,
 		}
 	}
 	return outbound, nil
@@ -75,18 +81,12 @@ func (h *Shadowsocks) DialContext(ctx context.Context, network string, destinati
 		case N.NetworkTCP:
 			h.logger.InfoContext(ctx, "outbound connection to ", destination)
 		case N.NetworkUDP:
-			if h.uot {
-				h.logger.InfoContext(ctx, "outbound UoT packet connection to ", destination)
-				tcpConn, err := (*shadowsocksDialer)(h).DialContext(ctx, N.NetworkTCP, M.Socksaddr{
-					Fqdn: uot.UOTMagicAddress,
-					Port: destination.Port,
-				})
-				if err != nil {
-					return nil, err
-				}
-				return uot.NewClientConn(tcpConn), nil
+			if h.uotClient != nil {
+				h.logger.InfoContext(ctx, "outbound UoT connect packet connection to ", destination)
+				return h.uotClient.DialContext(ctx, network, destination)
+			} else {
+				h.logger.InfoContext(ctx, "outbound packet connection to ", destination)
 			}
-			h.logger.InfoContext(ctx, "outbound packet connection to ", destination)
 		}
 		return (*shadowsocksDialer)(h).DialContext(ctx, network, destination)
 	} else {
@@ -105,16 +105,11 @@ func (h *Shadowsocks) ListenPacket(ctx context.Context, destination M.Socksaddr)
 	metadata.Outbound = h.tag
 	metadata.Destination = destination
 	if h.multiplexDialer == nil {
-		if h.uot {
+		if h.uotClient != nil {
 			h.logger.InfoContext(ctx, "outbound UoT packet connection to ", destination)
-			tcpConn, err := (*shadowsocksDialer)(h).DialContext(ctx, N.NetworkTCP, M.Socksaddr{
-				Fqdn: uot.UOTMagicAddress,
-				Port: destination.Port,
-			})
-			if err != nil {
-				return nil, err
-			}
-			return uot.NewClientConn(tcpConn), nil
+			return h.uotClient.ListenPacket(ctx, destination)
+		} else {
+			h.logger.InfoContext(ctx, "outbound packet connection to ", destination)
 		}
 		h.logger.InfoContext(ctx, "outbound packet connection to ", destination)
 		return (*shadowsocksDialer)(h).ListenPacket(ctx, destination)
@@ -125,7 +120,7 @@ func (h *Shadowsocks) ListenPacket(ctx context.Context, destination M.Socksaddr)
 }
 
 func (h *Shadowsocks) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext) error {
-	return NewEarlyConnection(ctx, h, conn, metadata)
+	return NewConnection(ctx, h, conn, metadata)
 }
 
 func (h *Shadowsocks) NewPacketConnection(ctx context.Context, conn N.PacketConn, metadata adapter.InboundContext) error {

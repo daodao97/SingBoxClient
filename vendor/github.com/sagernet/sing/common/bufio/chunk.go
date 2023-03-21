@@ -49,9 +49,27 @@ func (c *ChunkReader) Read(p []byte) (n int, err error) {
 	c.cache.FullReset()
 	err = c.upstream.ReadBuffer(c.cache)
 	if err != nil {
+		c.cache.Release()
+		c.cache = nil
 		return
 	}
 	return c.cache.Read(p)
+}
+
+func (c *ChunkReader) ReadChunk() (*buf.Buffer, error) {
+	if c.cache == nil {
+		c.cache = buf.NewSize(c.maxChunkSize)
+	} else if !c.cache.IsEmpty() {
+		return c.cache, nil
+	}
+	c.cache.FullReset()
+	err := c.upstream.ReadBuffer(c.cache)
+	if err != nil {
+		c.cache.Release()
+		c.cache = nil
+		return nil, err
+	}
+	return c.cache, nil
 }
 
 func (c *ChunkReader) MTU() int {

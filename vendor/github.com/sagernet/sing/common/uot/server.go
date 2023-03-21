@@ -12,13 +12,17 @@ import (
 
 type ServerConn struct {
 	net.PacketConn
+	version                   int
+	isConnect                 bool
+	destination               M.Socksaddr
 	inputReader, outputReader *io.PipeReader
 	inputWriter, outputWriter *io.PipeWriter
 }
 
-func NewServerConn(packetConn net.PacketConn) net.Conn {
+func NewServerConn(packetConn net.PacketConn, version int) net.Conn {
 	c := &ServerConn{
 		PacketConn: packetConn,
+		version:    version,
 	}
 	c.inputReader, c.inputWriter = io.Pipe()
 	c.outputReader, c.outputWriter = io.Pipe()
@@ -35,25 +39,34 @@ func (c *ServerConn) Write(b []byte) (n int, err error) {
 	return c.inputWriter.Write(b)
 }
 
-type pipeAddr struct{}
-
-func (pipeAddr) Network() string { return "pipe" }
-func (pipeAddr) String() string  { return "pipe" }
-
 func (c *ServerConn) RemoteAddr() net.Addr {
-	return pipeAddr{}
+	return M.Socksaddr{Fqdn: "pipe"}
 }
 
 //warn:unsafe
 func (c *ServerConn) loopInput() {
+	if c.version == Version {
+		request, err := ReadRequest(c.inputReader)
+		if err != nil {
+			return
+		}
+		c.isConnect = request.IsConnect
+		c.destination = request.Destination
+	}
 	_buffer := buf.StackNew()
 	defer common.KeepAlive(_buffer)
 	buffer := common.Dup(_buffer)
 	defer buffer.Release()
 	for {
-		destination, err := AddrParser.ReadAddrPort(c.inputReader)
-		if err != nil {
-			break
+		var destination M.Socksaddr
+		var err error
+		if !c.isConnect {
+			destination = c.destination
+		} else {
+			destination, err = AddrParser.ReadAddrPort(c.inputReader)
+			if err != nil {
+				break
+			}
 		}
 		if destination.IsFqdn() {
 			addr, err := net.ResolveUDPAddr("udp", destination.String())
@@ -92,9 +105,11 @@ func (c *ServerConn) loopOutput() {
 		if err != nil {
 			break
 		}
-		err = AddrParser.WriteAddrPort(c.outputWriter, M.SocksaddrFromNet(addr))
-		if err != nil {
-			break
+		if !c.isConnect {
+			err = AddrParser.WriteAddrPort(c.outputWriter, M.SocksaddrFromNet(addr))
+			if err != nil {
+				break
+			}
 		}
 		err = binary.Write(c.outputWriter, binary.BigEndian, uint16(n))
 		if err != nil {

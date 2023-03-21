@@ -16,6 +16,7 @@ type CachedConn struct {
 }
 
 func NewCachedConn(conn net.Conn, buffer *buf.Buffer) *CachedConn {
+	buffer.IncRef()
 	return &CachedConn{
 		Conn:   conn,
 		buffer: buffer,
@@ -25,6 +26,9 @@ func NewCachedConn(conn net.Conn, buffer *buf.Buffer) *CachedConn {
 func (c *CachedConn) ReadCached() *buf.Buffer {
 	buffer := c.buffer
 	c.buffer = nil
+	if buffer != nil {
+		buffer.DecRef()
+	}
 	return buffer
 }
 
@@ -34,6 +38,7 @@ func (c *CachedConn) Read(p []byte) (n int, err error) {
 		if err == nil {
 			return
 		}
+		c.buffer.DecRef()
 		c.buffer.Release()
 		c.buffer = nil
 	}
@@ -44,6 +49,7 @@ func (c *CachedConn) WriteTo(w io.Writer) (n int64, err error) {
 	if c.buffer != nil {
 		wn, wErr := w.Write(c.buffer.Bytes())
 		if wErr != nil {
+			c.buffer.DecRef()
 			c.buffer.Release()
 			c.buffer = nil
 		}
@@ -78,7 +84,11 @@ func (c *CachedConn) WriterReplaceable() bool {
 }
 
 func (c *CachedConn) Close() error {
-	c.buffer.Release()
+	if buffer := c.buffer; buffer != nil {
+		buffer.DecRef()
+		buffer.Release()
+		c.buffer = nil
+	}
 	return c.Conn.Close()
 }
 
@@ -88,6 +98,7 @@ type CachedReader struct {
 }
 
 func NewCachedReader(upstream io.Reader, buffer *buf.Buffer) *CachedReader {
+	buffer.IncRef()
 	return &CachedReader{
 		upstream: upstream,
 		buffer:   buffer,
@@ -97,6 +108,9 @@ func NewCachedReader(upstream io.Reader, buffer *buf.Buffer) *CachedReader {
 func (r *CachedReader) ReadCached() *buf.Buffer {
 	buffer := r.buffer
 	r.buffer = nil
+	if buffer != nil {
+		buffer.DecRef()
+	}
 	return buffer
 }
 
@@ -106,6 +120,7 @@ func (r *CachedReader) Read(p []byte) (n int, err error) {
 		if err == nil {
 			return
 		}
+		r.buffer.DecRef()
 		r.buffer.Release()
 		r.buffer = nil
 	}
@@ -134,7 +149,11 @@ func (r *CachedReader) ReaderReplaceable() bool {
 }
 
 func (r *CachedReader) Close() error {
-	r.buffer.Release()
+	if buffer := r.buffer; buffer != nil {
+		buffer.DecRef()
+		buffer.Release()
+		r.buffer = nil
+	}
 	return nil
 }
 
@@ -145,6 +164,7 @@ type CachedPacketConn struct {
 }
 
 func NewCachedPacketConn(conn N.PacketConn, buffer *buf.Buffer, destination M.Socksaddr) *CachedPacketConn {
+	buffer.IncRef()
 	return &CachedPacketConn{
 		PacketConn:  conn,
 		buffer:      buffer,
@@ -158,6 +178,8 @@ func (c *CachedPacketConn) ReadPacket(buffer *buf.Buffer) (destination M.Socksad
 		if err != nil {
 			return M.Socksaddr{}, err
 		}
+		c.buffer.DecRef()
+		c.buffer.Release()
 		c.buffer = nil
 		return c.destination, nil
 	}
@@ -167,6 +189,9 @@ func (c *CachedPacketConn) ReadPacket(buffer *buf.Buffer) (destination M.Socksad
 func (c *CachedPacketConn) ReadCachedPacket() (destination M.Socksaddr, buffer *buf.Buffer) {
 	buffer = c.buffer
 	c.buffer = nil
+	if buffer != nil {
+		buffer.DecRef()
+	}
 	return c.destination, buffer
 }
 
@@ -180,4 +205,13 @@ func (c *CachedPacketConn) ReaderReplaceable() bool {
 
 func (c *CachedPacketConn) WriterReplaceable() bool {
 	return true
+}
+
+func (c *CachedPacketConn) Close() error {
+	if buffer := c.buffer; buffer != nil {
+		buffer.DecRef()
+		buffer.Release()
+		c.buffer = nil
+	}
+	return c.PacketConn.Close()
 }

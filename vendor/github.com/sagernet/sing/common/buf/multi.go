@@ -16,6 +16,14 @@ func ToSliceMulti(buffers []*Buffer) [][]byte {
 	})
 }
 
+func CopyMulti(toBuffer []byte, buffers []*Buffer) int {
+	var n int
+	for _, buffer := range buffers {
+		n += copy(toBuffer[n:], buffer.Bytes())
+	}
+	return n
+}
+
 func ReleaseMulti(buffers []*Buffer) {
 	for _, buffer := range buffers {
 		buffer.Release()

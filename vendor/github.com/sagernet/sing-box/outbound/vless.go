@@ -15,6 +15,7 @@ import (
 	"github.com/sagernet/sing-dns"
 	"github.com/sagernet/sing-vmess/packetaddr"
 	"github.com/sagernet/sing/common"
+	"github.com/sagernet/sing/common/bufio"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -58,16 +59,20 @@ func NewVLESS(ctx context.Context, router adapter.Router, logger log.ContextLogg
 			return nil, E.Cause(err, "create client transport: ", options.Transport.Type)
 		}
 	}
-	switch options.PacketEncoding {
-	case "":
-	case "packetaddr":
-		outbound.packetAddr = true
-	case "xudp":
+	if options.PacketEncoding == nil {
 		outbound.xudp = true
-	default:
-		return nil, E.New("unknown packet encoding: ", options.PacketEncoding)
+	} else {
+		switch *options.PacketEncoding {
+		case "":
+		case "packetaddr":
+			outbound.packetAddr = true
+		case "xudp":
+			outbound.xudp = true
+		default:
+			return nil, E.New("unknown packet encoding: ", options.PacketEncoding)
+		}
 	}
-	outbound.client, err = vless.NewClient(options.UUID, options.Flow)
+	outbound.client, err = vless.NewClient(options.UUID, options.Flow, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +102,17 @@ func (h *VLESS) DialContext(ctx context.Context, network string, destination M.S
 		return h.client.DialEarlyConn(conn, destination)
 	case N.NetworkUDP:
 		h.logger.InfoContext(ctx, "outbound packet connection to ", destination)
-		return h.client.DialEarlyPacketConn(conn, destination)
+		if h.xudp {
+			return h.client.DialEarlyXUDPPacketConn(conn, destination)
+		} else if h.packetAddr {
+			packetConn, err := h.client.DialEarlyPacketConn(conn, M.Socksaddr{Fqdn: packetaddr.SeqPacketMagicAddress})
+			if err != nil {
+				return nil, err
+			}
+			return &bufio.BindPacketConn{PacketConn: dialer.NewResolvePacketConn(ctx, h.router, dns.DomainStrategyAsIS, packetaddr.NewConn(packetConn, destination)), Addr: destination}, nil
+		} else {
+			return h.client.DialEarlyPacketConn(conn, destination)
+		}
 	default:
 		return nil, E.Extend(N.ErrUnknownNetwork, network)
 	}
@@ -119,6 +134,7 @@ func (h *VLESS) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.
 		}
 	}
 	if err != nil {
+		common.Close(conn)
 		return nil, err
 	}
 	if h.xudp {
@@ -135,7 +151,7 @@ func (h *VLESS) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.
 }
 
 func (h *VLESS) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext) error {
-	return NewEarlyConnection(ctx, h, conn, metadata)
+	return NewConnection(ctx, h, conn, metadata)
 }
 
 func (h *VLESS) NewPacketConnection(ctx context.Context, conn N.PacketConn, metadata adapter.InboundContext) error {

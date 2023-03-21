@@ -37,6 +37,11 @@ func NewShadowTLS(ctx context.Context, router adapter.Router, logger log.Context
 	if options.TLS == nil || !options.TLS.Enabled {
 		return nil, C.ErrTLSRequired
 	}
+
+	if options.Version == 0 {
+		options.Version = 1
+	}
+
 	if options.Version == 1 {
 		options.TLS.MinVersion = "1.2"
 		options.TLS.MaxVersion = "1.2"
@@ -53,7 +58,7 @@ func NewShadowTLS(ctx context.Context, router adapter.Router, logger log.Context
 			return common.Error(tls.ClientHandshake(ctx, conn, tlsConfig))
 		}
 	case 3:
-		if idConfig, loaded := tlsConfig.(tls.ConfigWithSessionIDGenerator); loaded {
+		if idConfig, loaded := tlsConfig.(tls.WithSessionIDGenerator); loaded {
 			tlsHandshakeFunc = func(ctx context.Context, conn net.Conn, sessionIDGenerator shadowtls.TLSSessionIDGeneratorFunc) error {
 				idConfig.SetSessionIDGenerator(sessionIDGenerator)
 				return common.Error(tls.ClientHandshake(ctx, conn, tlsConfig))

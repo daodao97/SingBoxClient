@@ -17,7 +17,7 @@ type Handler interface {
 }
 
 type MultiError interface {
-	UnwrapMulti() []error
+	Unwrap() []error
 }
 
 func New(message ...any) error {

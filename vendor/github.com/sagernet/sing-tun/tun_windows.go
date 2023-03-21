@@ -36,7 +36,10 @@ type NativeTun struct {
 	fwpmSession uintptr
 }
 
-func Open(options Options) (WinTun, error) {
+func New(options Options) (WinTun, error) {
+	if options.FileDescriptor != 0 {
+		return nil, os.ErrInvalid
+	}
 	adapter, err := wintun.CreateAdapter(options.Name, TunnelType, generateGUIDByDeviceName(options.Name))
 	if err != nil {
 		return nil, err

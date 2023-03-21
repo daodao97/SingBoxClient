@@ -255,7 +255,7 @@ func (s *Stream) sendWindowUpdate(consumed uint32) error {
 	binary.LittleEndian.PutUint32(hdr[:], consumed)
 	binary.LittleEndian.PutUint32(hdr[4:], uint32(s.sess.config.MaxStreamBuffer))
 	frame.data = hdr[:]
-	_, err := s.sess.writeFrameInternal(frame, deadline, 0)
+	_, err := s.sess.writeFrameInternal(frame, deadline, CLSDATA)
 	return err
 }
 
@@ -324,7 +324,7 @@ func (s *Stream) Write(b []byte) (n int, err error) {
 		}
 		frame.data = bts[:sz]
 		bts = bts[sz:]
-		n, err := s.sess.writeFrameInternal(frame, deadline, s.numWritten)
+		n, err := s.sess.writeFrameInternal(frame, deadline, CLSDATA)
 		s.numWritten++
 		sent += n
 		if err != nil {
@@ -392,7 +392,7 @@ func (s *Stream) writeV2(b []byte) (n int, err error) {
 				}
 				frame.data = bts[:sz]
 				bts = bts[sz:]
-				n, err := s.sess.writeFrameInternal(frame, deadline, atomic.LoadUint32(&s.numWritten))
+				n, err := s.sess.writeFrameInternal(frame, deadline, CLSDATA)
 				atomic.AddUint32(&s.numWritten, uint32(sz))
 				sent += n
 				if err != nil {

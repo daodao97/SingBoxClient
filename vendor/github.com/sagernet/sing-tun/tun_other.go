@@ -6,6 +6,6 @@ import (
 	"os"
 )
 
-func Open(config Options) (Tun, error) {
+func New(config Options) (Tun, error) {
 	return nil, os.ErrInvalid
 }

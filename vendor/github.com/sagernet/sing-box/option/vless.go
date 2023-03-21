@@ -10,6 +10,7 @@ type VLESSInboundOptions struct {
 type VLESSUser struct {
 	Name string `json:"name"`
 	UUID string `json:"uuid"`
+	Flow string `json:"flow,omitempty"`
 }
 
 type VLESSOutboundOptions struct {
@@ -20,5 +21,5 @@ type VLESSOutboundOptions struct {
 	Network        NetworkList            `json:"network,omitempty"`
 	TLS            *OutboundTLSOptions    `json:"tls,omitempty"`
 	Transport      *V2RayTransportOptions `json:"transport,omitempty"`
-	PacketEncoding string                 `json:"packet_encoding,omitempty"`
+	PacketEncoding *string                `json:"packet_encoding,omitempty"`
 }

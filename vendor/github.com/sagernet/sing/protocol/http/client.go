@@ -65,30 +65,36 @@ func (c *Client) DialContext(ctx context.Context, network string, destination M.
 	}
 	err = request.Write(conn)
 	if err != nil {
+		conn.Close()
 		return nil, err
 	}
 	reader := std_bufio.NewReader(conn)
 	response, err := http.ReadResponse(reader, request)
 	if err != nil {
+		conn.Close()
 		return nil, err
 	}
-	switch response.StatusCode {
-	case http.StatusOK:
+	if response.StatusCode == http.StatusOK {
 		if reader.Buffered() > 0 {
 			buffer := buf.NewSize(reader.Buffered())
 			_, err = buffer.ReadFullFrom(reader, buffer.FreeLen())
 			if err != nil {
+				conn.Close()
 				return nil, err
 			}
 			conn = bufio.NewCachedConn(conn, buffer)
 		}
 		return conn, nil
-	case http.StatusProxyAuthRequired:
-		return nil, E.New("authentication required")
-	case http.StatusMethodNotAllowed:
-		return nil, E.New("method not allowed")
-	default:
-		return nil, E.New("unexpected status: ", response.Status)
+	} else {
+		conn.Close()
+		switch response.StatusCode {
+		case http.StatusProxyAuthRequired:
+			return nil, E.New("authentication required")
+		case http.StatusMethodNotAllowed:
+			return nil, E.New("method not allowed")
+		default:
+			return nil, E.New("unexpected status: ", response.Status)
+		}
 	}
 }
 

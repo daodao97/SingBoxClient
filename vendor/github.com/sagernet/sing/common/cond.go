@@ -268,16 +268,18 @@ func Must(errs ...error) {
 	}
 }
 
-func Must1(_ any, err error) {
+func Must1[T any](result T, err error) T {
 	if err != nil {
 		panic(err)
 	}
+	return result
 }
 
-func Must2(_, _ any, err error) {
+func Must2[T any, T2 any](result T, result2 T2, err error) (T, T2) {
 	if err != nil {
 		panic(err)
 	}
+	return result, result2
 }
 
 // Deprecated: use E.Errors

@@ -19,6 +19,7 @@ import (
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
+	aTLS "github.com/sagernet/sing/common/tls"
 	sHttp "github.com/sagernet/sing/protocol/http"
 	"github.com/sagernet/websocket"
 )
@@ -27,6 +28,7 @@ var _ adapter.V2RayServerTransport = (*Server)(nil)
 
 type Server struct {
 	ctx                 context.Context
+	tlsConfig           tls.ServerConfig
 	handler             adapter.V2RayServerTransportHandler
 	httpServer          *http.Server
 	path                string
@@ -37,6 +39,7 @@ type Server struct {
 func NewServer(ctx context.Context, options option.V2RayWebsocketOptions, tlsConfig tls.ServerConfig, handler adapter.V2RayServerTransportHandler) (*Server, error) {
 	server := &Server{
 		ctx:                 ctx,
+		tlsConfig:           tlsConfig,
 		handler:             handler,
 		path:                options.Path,
 		maxEarlyData:        options.MaxEarlyData,
@@ -49,13 +52,6 @@ func NewServer(ctx context.Context, options option.V2RayWebsocketOptions, tlsCon
 		Handler:           server,
 		ReadHeaderTimeout: C.TCPTimeout,
 		MaxHeaderBytes:    http.DefaultMaxHeaderBytes,
-	}
-	if tlsConfig != nil {
-		stdConfig, err := tlsConfig.Config()
-		if err != nil {
-			return nil, err
-		}
-		server.httpServer.TLSConfig = stdConfig
 	}
 	return server, nil
 }
@@ -128,11 +124,10 @@ func (s *Server) Network() []string {
 }
 
 func (s *Server) Serve(listener net.Listener) error {
-	if s.httpServer.TLSConfig == nil {
-		return s.httpServer.Serve(listener)
-	} else {
-		return s.httpServer.ServeTLS(listener, "", "")
+	if s.tlsConfig != nil {
+		listener = aTLS.NewListener(listener, s.tlsConfig)
 	}
+	return s.httpServer.Serve(listener)
 }
 
 func (s *Server) ServePacket(listener net.PacketConn) error {

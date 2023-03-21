@@ -4,19 +4,25 @@ package tls
 
 import (
 	"bytes"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ed25519"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"io"
+	mRand "math/rand"
 	"net"
+	"net/http"
 	"reflect"
+	"strings"
 	"time"
 	"unsafe"
 
@@ -24,17 +30,19 @@ import (
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common/debug"
 	E "github.com/sagernet/sing/common/exceptions"
+	aTLS "github.com/sagernet/sing/common/tls"
 	utls "github.com/sagernet/utls"
 
 	"golang.org/x/crypto/hkdf"
+	"golang.org/x/net/http2"
 )
 
-var _ Config = (*RealityClientConfig)(nil)
+var _ ConfigCompat = (*RealityClientConfig)(nil)
 
 type RealityClientConfig struct {
 	uClient   *UTLSClientConfig
 	publicKey []byte
-	shortID   []byte
+	shortID   [8]byte
 }
 
 func NewRealityClient(router adapter.Router, serverAddress string, options option.OutboundTLSOptions) (*RealityClientConfig, error) {
@@ -54,11 +62,12 @@ func NewRealityClient(router adapter.Router, serverAddress string, options optio
 	if len(publicKey) != 32 {
 		return nil, E.New("invalid public_key")
 	}
-	shortID, err := hex.DecodeString(options.Reality.ShortID)
+	var shortID [8]byte
+	decodedLen, err := hex.Decode(shortID[:], []byte(options.Reality.ShortID))
 	if err != nil {
 		return nil, E.Cause(err, "decode short_id")
 	}
-	if len(shortID) != 8 {
+	if decodedLen > 8 {
 		return nil, E.New("invalid short_id")
 	}
 	return &RealityClientConfig{uClient, publicKey, shortID}, nil
@@ -85,6 +94,10 @@ func (e *RealityClientConfig) Config() (*STDConfig, error) {
 }
 
 func (e *RealityClientConfig) Client(conn net.Conn) (Conn, error) {
+	return ClientHandshake(context.Background(), conn, e)
+}
+
+func (e *RealityClientConfig) ClientHandshake(ctx context.Context, conn net.Conn) (aTLS.Conn, error) {
 	verifier := &realityVerifier{
 		serverName: e.uClient.ServerName(),
 	}
@@ -113,7 +126,7 @@ func (e *RealityClientConfig) Client(conn net.Conn) (Conn, error) {
 	hello.SessionId[0] = 1
 	hello.SessionId[1] = 7
 	hello.SessionId[2] = 5
-	copy(hello.SessionId[8:], e.shortID)
+	copy(hello.SessionId[8:], e.shortID[:])
 
 	if debug.Enabled {
 		fmt.Printf("REALITY hello.sessionId[:16]: %v\n", hello.SessionId[:16])
@@ -137,7 +150,41 @@ func (e *RealityClientConfig) Client(conn net.Conn) (Conn, error) {
 		fmt.Printf("REALITY uConn.AuthKey: %v\n", authKey)
 	}
 
+	err = uConn.HandshakeContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if debug.Enabled {
+		fmt.Printf("REALITY Conn.Verified: %v\n", verifier.verified)
+	}
+
+	if !verifier.verified {
+		go realityClientFallback(uConn, e.uClient.ServerName(), e.uClient.id)
+		return nil, E.New("reality verification failed")
+	}
+
 	return &utlsConnWrapper{uConn}, nil
+}
+
+func realityClientFallback(uConn net.Conn, serverName string, fingerprint utls.ClientHelloID) {
+	defer uConn.Close()
+	client := &http.Client{
+		Transport: &http2.Transport{
+			DialTLSContext: func(ctx context.Context, network, addr string, config *tls.Config) (net.Conn, error) {
+				return uConn, nil
+			},
+		},
+	}
+	request, _ := http.NewRequest("GET", "https://"+serverName, nil)
+	request.Header.Set("User-Agent", fingerprint.Client)
+	request.AddCookie(&http.Cookie{Name: "padding", Value: strings.Repeat("0", mRand.Intn(32)+30)})
+	response, err := client.Do(request)
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, response.Body)
+	response.Body.Close()
 }
 
 func (e *RealityClientConfig) SetSessionIDGenerator(generator func(clientHello []byte, sessionID []byte) error) {
@@ -179,9 +226,6 @@ func (c *realityVerifier) VerifyPeerCertificate(rawCerts [][]byte, verifiedChain
 	}
 	if _, err := certs[0].Verify(opts); err != nil {
 		return err
-	}
-	if !c.verified {
-		return E.New("reality verification failed")
 	}
 	return nil
 }

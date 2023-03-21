@@ -456,6 +456,10 @@ func (c *clientConn) ReadFrom(r io.Reader) (n int64, err error) {
 	return bufio.Copy(c.writer, r)
 }
 
+func (c *clientConn) NeedHandshake() bool {
+	return c.writer == nil
+}
+
 func (c *clientConn) Upstream() any {
 	return c.Conn
 }

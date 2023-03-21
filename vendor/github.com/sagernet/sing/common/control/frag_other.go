@@ -1,4 +1,4 @@
-//go:build !((go1.19 && unix) || (!go1.19 && (linux || darwin)) || windows)
+//go:build !(linux || windows || darwin)
 
 package control
 

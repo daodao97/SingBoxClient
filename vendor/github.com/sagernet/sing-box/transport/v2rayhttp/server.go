@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/tls"
@@ -15,6 +16,7 @@ import (
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
+	aTLS "github.com/sagernet/sing/common/tls"
 	sHttp "github.com/sagernet/sing/protocol/http"
 
 	"golang.org/x/net/http2"
@@ -25,6 +27,7 @@ var _ adapter.V2RayServerTransport = (*Server)(nil)
 
 type Server struct {
 	ctx        context.Context
+	tlsConfig  tls.ServerConfig
 	handler    adapter.V2RayServerTransportHandler
 	httpServer *http.Server
 	h2Server   *http2.Server
@@ -41,13 +44,16 @@ func (s *Server) Network() []string {
 
 func NewServer(ctx context.Context, options option.V2RayHTTPOptions, tlsConfig tls.ServerConfig, handler adapter.V2RayServerTransportHandler) (*Server, error) {
 	server := &Server{
-		ctx:      ctx,
-		handler:  handler,
-		h2Server: new(http2.Server),
-		host:     options.Host,
-		path:     options.Path,
-		method:   options.Method,
-		headers:  make(http.Header),
+		ctx:       ctx,
+		tlsConfig: tlsConfig,
+		handler:   handler,
+		h2Server: &http2.Server{
+			IdleTimeout: time.Duration(options.IdleTimeout),
+		},
+		host:    options.Host,
+		path:    options.Path,
+		method:  options.Method,
+		headers: make(http.Header),
 	}
 	if server.method == "" {
 		server.method = "PUT"
@@ -64,13 +70,6 @@ func NewServer(ctx context.Context, options option.V2RayHTTPOptions, tlsConfig t
 		MaxHeaderBytes:    http.DefaultMaxHeaderBytes,
 	}
 	server.h2cHandler = h2c.NewHandler(server, server.h2Server)
-	if tlsConfig != nil {
-		stdConfig, err := tlsConfig.Config()
-		if err != nil {
-			return nil, err
-		}
-		server.httpServer.TLSConfig = stdConfig
-	}
 	return server, nil
 }
 
@@ -136,19 +135,10 @@ func (s *Server) fallbackRequest(ctx context.Context, writer http.ResponseWriter
 }
 
 func (s *Server) Serve(listener net.Listener) error {
-	fixTLSConfig := s.httpServer.TLSConfig == nil
-	err := http2.ConfigureServer(s.httpServer, s.h2Server)
-	if err != nil {
-		return err
+	if s.tlsConfig != nil {
+		listener = aTLS.NewListener(listener, s.tlsConfig)
 	}
-	if fixTLSConfig {
-		s.httpServer.TLSConfig = nil
-	}
-	if s.httpServer.TLSConfig == nil {
-		return s.httpServer.Serve(listener)
-	} else {
-		return s.httpServer.ServeTLS(listener, "", "")
-	}
+	return s.httpServer.Serve(listener)
 }
 
 func (s *Server) ServePacket(listener net.PacketConn) error {

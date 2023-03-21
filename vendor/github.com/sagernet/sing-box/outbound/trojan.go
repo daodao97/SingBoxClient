@@ -96,7 +96,7 @@ func (h *Trojan) ListenPacket(ctx context.Context, destination M.Socksaddr) (net
 }
 
 func (h *Trojan) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext) error {
-	return NewEarlyConnection(ctx, h, conn, metadata)
+	return NewConnection(ctx, h, conn, metadata)
 }
 
 func (h *Trojan) NewPacketConnection(ctx context.Context, conn N.PacketConn, metadata adapter.InboundContext) error {
@@ -124,6 +124,7 @@ func (h *trojanDialer) DialContext(ctx context.Context, network string, destinat
 		}
 	}
 	if err != nil {
+		common.Close(conn)
 		return nil, err
 	}
 	switch N.NetworkName(network) {

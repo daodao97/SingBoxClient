@@ -3,7 +3,6 @@ package bufio
 import (
 	"io"
 	"net"
-	"sync"
 	"syscall"
 
 	"github.com/sagernet/sing/common"
@@ -16,7 +15,7 @@ func NewVectorisedWriter(writer io.Writer) N.VectorisedWriter {
 	if vectorisedWriter, ok := CreateVectorisedWriter(writer); ok {
 		return vectorisedWriter
 	}
-	return &SerialVectorisedWriter{upstream: writer}
+	return &BufferedVectorisedWriter{upstream: writer}
 }
 
 func CreateVectorisedWriter(writer any) (N.VectorisedWriter, bool) {
@@ -57,26 +56,35 @@ func CreateVectorisedPacketWriter(writer any) (N.VectorisedPacketWriter, bool) {
 	return nil, false
 }
 
-var _ N.VectorisedWriter = (*SerialVectorisedWriter)(nil)
+var _ N.VectorisedWriter = (*BufferedVectorisedWriter)(nil)
 
-type SerialVectorisedWriter struct {
+type BufferedVectorisedWriter struct {
 	upstream io.Writer
-	access   sync.Mutex
 }
 
-func (w *SerialVectorisedWriter) WriteVectorised(buffers []*buf.Buffer) error {
-	w.access.Lock()
-	defer w.access.Unlock()
-	for _, buffer := range buffers {
-		_, err := w.upstream.Write(buffer.Bytes())
-		if err != nil {
-			return err
-		}
+func (w *BufferedVectorisedWriter) WriteVectorised(buffers []*buf.Buffer) error {
+	defer buf.ReleaseMulti(buffers)
+	bufferLen := buf.LenMulti(buffers)
+	if bufferLen == 0 {
+		return common.Error(w.upstream.Write(nil))
+	} else if len(buffers) == 1 {
+		return common.Error(w.upstream.Write(buffers[0].Bytes()))
 	}
-	return nil
+	var bufferBytes []byte
+	if bufferLen > 65535 {
+		bufferBytes = make([]byte, bufferLen)
+	} else {
+		_buffer := buf.StackNewSize(bufferLen)
+		defer common.KeepAlive(_buffer)
+		buffer := common.Dup(_buffer)
+		defer buffer.Release()
+		bufferBytes = buffer.FreeBytes()
+	}
+	buf.CopyMulti(bufferBytes, buffers)
+	return common.Error(w.upstream.Write(bufferBytes))
 }
 
-func (w *SerialVectorisedWriter) Upstream() any {
+func (w *BufferedVectorisedWriter) Upstream() any {
 	return w.upstream
 }
 

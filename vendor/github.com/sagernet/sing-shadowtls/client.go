@@ -42,9 +42,7 @@ func NewClient(config ClientConfig) (*Client, error) {
 		tlsHandshake: config.TLSHandshake,
 		logger:       config.Logger,
 	}
-	if !client.server.IsValid() || client.dialer == nil {
-		return nil, os.ErrInvalid
-	}
+
 	switch client.version {
 	case 1, 2, 3:
 	default:
@@ -61,10 +59,22 @@ func (c *Client) SetHandshakeFunc(handshakeFunc TLSHandshakeFunc) {
 }
 
 func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
+	if !c.server.IsValid() {
+		return nil, os.ErrInvalid
+	}
 	conn, err := c.dialer.DialContext(ctx, N.NetworkTCP, c.server)
 	if err != nil {
 		return nil, err
 	}
+	shadowTLSConn, err :=  c.DialContextConn(ctx, conn)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	return shadowTLSConn, nil
+}
+
+func (c *Client) DialContextConn(ctx context.Context, conn net.Conn) (net.Conn, error) {
 	if c.tlsHandshake == nil {
 		return nil, os.ErrInvalid
 	}
@@ -72,7 +82,7 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 	default:
 		fallthrough
 	case 1:
-		err = c.tlsHandshake(ctx, conn, nil)
+		err := c.tlsHandshake(ctx, conn, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +90,7 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 		return conn, nil
 	case 2:
 		hashConn := newHashReadConn(conn, c.password)
-		err = c.tlsHandshake(ctx, hashConn, nil)
+		err := c.tlsHandshake(ctx, hashConn, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +98,7 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 		return newClientConn(hashConn), nil
 	case 3:
 		stream := newStreamWrapper(conn, c.password)
-		err = c.tlsHandshake(ctx, stream, generateSessionID(c.password))
+		err := c.tlsHandshake(ctx, stream, generateSessionID(c.password))
 		if err != nil {
 			return nil, err
 		}

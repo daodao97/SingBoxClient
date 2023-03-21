@@ -1,4 +1,4 @@
-//go:build with_embedded_tor
+//go:build with_embedded_tor && !(android || ios)
 
 package outbound
 

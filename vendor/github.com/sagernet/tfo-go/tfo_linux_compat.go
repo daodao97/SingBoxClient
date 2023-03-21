@@ -14,20 +14,26 @@ func (d *Dialer) dialTFOContext(ctx context.Context, network, address string, b 
 		switch {
 		case d.ControlContext != nil:
 			if err = d.ControlContext(ctx, network, address, c); err != nil {
-				return
+				return err
 			}
 		case d.Control != nil:
 			if err = d.Control(network, address, c); err != nil {
-				return
+				return err
 			}
 		}
+
 		if cerr := c.Control(func(fd uintptr) {
 			err = SetTFODialer(fd)
 		}); cerr != nil {
 			return cerr
 		}
-		return
+
+		if err != nil {
+			return wrapSyscallError("setsockopt", err)
+		}
+		return nil
 	}
+
 	c, err := ld.Dialer.DialContext(ctx, network, address)
 	if err != nil {
 		return nil, err

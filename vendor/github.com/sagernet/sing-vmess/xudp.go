@@ -28,6 +28,15 @@ func NewXUDPConn(conn net.Conn, destination M.Socksaddr) *XUDPConn {
 	}
 }
 
+func (c *XUDPConn) Read(p []byte) (n int, err error) {
+	n, _, err = c.ReadFrom(p)
+	return
+}
+
+func (c *XUDPConn) Write(p []byte) (n int, err error) {
+	return c.WriteTo(p, c.destination)
+}
+
 func (c *XUDPConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	buffer := buf.With(p)
 	var destination M.Socksaddr
@@ -153,6 +162,10 @@ func (c *XUDPConn) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) erro
 
 func (c *XUDPConn) FrontHeadroom() int {
 	return c.frontHeadroom(M.MaxSocksaddrLength)
+}
+
+func (c *XUDPConn) NeedHandshake() bool {
+	return !c.requestWritten
 }
 
 func (c *XUDPConn) Upstream() any {

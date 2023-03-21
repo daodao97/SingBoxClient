@@ -227,6 +227,10 @@ func (c *clientConn) ReadFrom(r io.Reader) (n int64, err error) {
 	return c.writer.ReadFrom(r)
 }
 
+func (c *clientConn) NeedHandshake() bool {
+	return c.writer == nil
+}
+
 func (c *clientConn) Upstream() any {
 	return c.Conn
 }

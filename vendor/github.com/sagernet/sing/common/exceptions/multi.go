@@ -16,7 +16,7 @@ func (e *multiError) Error() string {
 	return strings.Join(F.MapToString(e.errors), " | ")
 }
 
-func (e *multiError) UnwrapMulti() []error {
+func (e *multiError) Unwrap() []error {
 	return e.errors
 }
 
@@ -37,7 +37,7 @@ func Errors(errors ...error) error {
 
 func Expand(err error) []error {
 	if multiErr, isMultiErr := err.(MultiError); isMultiErr {
-		return ExpandAll(multiErr.UnwrapMulti())
+		return ExpandAll(multiErr.Unwrap())
 	}
 	return []error{err}
 }
@@ -64,7 +64,7 @@ func IsMulti(err error, targetList ...error) bool {
 	if !isMulti {
 		return false
 	}
-	return common.All(multiErr.UnwrapMulti(), func(it error) bool {
+	return common.All(multiErr.Unwrap(), func(it error) bool {
 		return IsMulti(it, targetList...)
 	})
 }

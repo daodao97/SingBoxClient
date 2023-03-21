@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	box "github.com/sagernet/sing-box"
+	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/option"
 )
 
@@ -30,14 +31,16 @@ func (s *SingBox) Close() {
 	s.Running = false
 }
 
-func (s *SingBox) Start(configPath string) error {
+func (s *SingBox) Start(basePath, configPath string) error {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Println(err)
 		}
 	}()
 
-	instance, cancel, err := create(configPath)
+	C.SetBasePath(basePath)
+
+	instance, cancel, err := create(filepath.Join(basePath, configPath))
 	if err != nil {
 		return err
 	}
@@ -73,7 +76,7 @@ func create(configPath string) (*box.Box, context.CancelFunc, error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	instance, err := box.New(ctx, options)
+	instance, err := box.New(ctx, options, nil)
 	if err != nil {
 		cancel()
 		return nil, nil, errors.Wrap(err, "sing-box core create service")
