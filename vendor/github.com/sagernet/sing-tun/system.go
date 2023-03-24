@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/netip"
+	"syscall"
 	"time"
 
 	"github.com/sagernet/sing-tun/internal/clashtcpip"
@@ -20,6 +21,7 @@ type System struct {
 	ctx                context.Context
 	tun                Tun
 	mtu                uint32
+	router             Router
 	handler            Handler
 	logger             logger.Logger
 	inet4Prefixes      []netip.Prefix
@@ -35,6 +37,7 @@ type System struct {
 	tcpPort6           uint16
 	tcpNat             *TCPNat
 	udpNat             *udpnat.Service[netip.AddrPort]
+	routeMapping       *RouteMapping
 }
 
 type Session struct {
@@ -50,10 +53,12 @@ func NewSystem(options StackOptions) (Stack, error) {
 		tun:           options.Tun,
 		mtu:           options.MTU,
 		udpTimeout:    options.UDPTimeout,
+		router:        options.Router,
 		handler:       options.Handler,
 		logger:        options.Logger,
 		inet4Prefixes: options.Inet4Address,
 		inet6Prefixes: options.Inet6Address,
+		routeMapping:  NewRouteMapping(options.UDPTimeout),
 	}
 	if len(options.Inet4Address) > 0 {
 		if options.Inet4Address[0].Bits() == 32 {
@@ -246,6 +251,21 @@ func (s *System) processIPv4TCP(packet clashtcpip.IPv4Packet, header clashtcpip.
 		packet.SetDestinationIP(session.Source.Addr())
 		header.SetDestinationPort(session.Source.Port())
 	} else {
+		if s.router != nil {
+			session := RouteSession{4, syscall.IPPROTO_TCP, source, destination}
+			action := s.routeMapping.Lookup(session, func() RouteAction {
+				return s.router.RouteConnection(session, &systemTCPDirectPacketWriter4{s.tun, source})
+			})
+			switch actionType := action.(type) {
+			case *ActionReject:
+				// TODO: send ICMP unreachable
+				return nil
+			case *ActionDirect:
+				return E.Append(nil, actionType.WritePacket(buf.As(packet).ToOwned()), func(err error) error {
+					return E.Cause(err, "route ipv4 tcp packet")
+				})
+			}
+		}
 		natPort := s.tcpNat.Lookup(source, destination)
 		packet.SetSourceIP(s.inet4Address)
 		header.SetSourcePort(natPort)
@@ -272,6 +292,21 @@ func (s *System) processIPv6TCP(packet clashtcpip.IPv6Packet, header clashtcpip.
 		packet.SetDestinationIP(session.Source.Addr())
 		header.SetDestinationPort(session.Source.Port())
 	} else {
+		if s.router != nil {
+			session := RouteSession{6, syscall.IPPROTO_TCP, source, destination}
+			action := s.routeMapping.Lookup(session, func() RouteAction {
+				return s.router.RouteConnection(session, &systemTCPDirectPacketWriter6{s.tun, source})
+			})
+			switch actionType := action.(type) {
+			case *ActionReject:
+				// TODO: send RST
+				return nil
+			case *ActionDirect:
+				return E.Append(nil, actionType.WritePacket(buf.As(packet).ToOwned()), func(err error) error {
+					return E.Cause(err, "route ipv6 tcp packet")
+				})
+			}
+		}
 		natPort := s.tcpNat.Lookup(source, destination)
 		packet.SetSourceIP(s.inet6Address)
 		header.SetSourcePort(natPort)
@@ -295,6 +330,21 @@ func (s *System) processIPv4UDP(packet clashtcpip.IPv4Packet, header clashtcpip.
 	if !destination.Addr().IsGlobalUnicast() {
 		return common.Error(s.tun.Write(packet))
 	}
+	if s.router != nil {
+		routeSession := RouteSession{4, syscall.IPPROTO_UDP, source, destination}
+		action := s.routeMapping.Lookup(routeSession, func() RouteAction {
+			return s.router.RouteConnection(routeSession, &systemUDPDirectPacketWriter4{s.tun, source})
+		})
+		switch actionType := action.(type) {
+		case *ActionReject:
+			// TODO: send icmp unreachable
+			return nil
+		case *ActionDirect:
+			return E.Append(nil, actionType.WritePacket(buf.As(packet).ToOwned()), func(err error) error {
+				return E.Cause(err, "route ipv4 udp packet")
+			})
+		}
+	}
 	data := buf.As(header.Payload())
 	if data.Len() == 0 {
 		return nil
@@ -307,7 +357,7 @@ func (s *System) processIPv4UDP(packet clashtcpip.IPv4Packet, header clashtcpip.
 		headerLen := packet.HeaderLen() + clashtcpip.UDPHeaderSize
 		headerCopy := make([]byte, headerLen)
 		copy(headerCopy, packet[:headerLen])
-		return &systemPacketWriter4{s.tun, headerCopy, source}
+		return &systemUDPPacketWriter4{s.tun, headerCopy, source}
 	})
 	return nil
 }
@@ -317,6 +367,21 @@ func (s *System) processIPv6UDP(packet clashtcpip.IPv6Packet, header clashtcpip.
 	destination := netip.AddrPortFrom(packet.DestinationIP(), header.DestinationPort())
 	if !destination.Addr().IsGlobalUnicast() {
 		return common.Error(s.tun.Write(packet))
+	}
+	if s.router != nil {
+		routeSession := RouteSession{6, syscall.IPPROTO_UDP, source, destination}
+		action := s.routeMapping.Lookup(routeSession, func() RouteAction {
+			return s.router.RouteConnection(routeSession, &systemUDPDirectPacketWriter6{s.tun, source})
+		})
+		switch actionType := action.(type) {
+		case *ActionReject:
+			// TODO: send icmp unreachable
+			return nil
+		case *ActionDirect:
+			return E.Append(nil, actionType.WritePacket(buf.As(packet).ToOwned()), func(err error) error {
+				return E.Cause(err, "route ipv6 udp packet")
+			})
+		}
 	}
 	data := buf.As(header.Payload())
 	if data.Len() == 0 {
@@ -330,12 +395,27 @@ func (s *System) processIPv6UDP(packet clashtcpip.IPv6Packet, header clashtcpip.
 		headerLen := len(packet) - int(header.Length()) + clashtcpip.UDPHeaderSize
 		headerCopy := make([]byte, headerLen)
 		copy(headerCopy, packet[:headerLen])
-		return &systemPacketWriter6{s.tun, headerCopy, source}
+		return &systemUDPPacketWriter6{s.tun, headerCopy, source}
 	})
 	return nil
 }
 
 func (s *System) processIPv4ICMP(packet clashtcpip.IPv4Packet, header clashtcpip.ICMPPacket) error {
+	if s.router != nil {
+		routeSession := RouteSession{4, clashtcpip.ICMP, netip.AddrPortFrom(packet.SourceIP(), 0), netip.AddrPortFrom(packet.DestinationIP(), 0)}
+		action := s.routeMapping.Lookup(routeSession, func() RouteAction {
+			return s.router.RouteConnection(routeSession, &systemICMPDirectPacketWriter4{s.tun, packet.SourceIP()})
+		})
+		switch actionType := action.(type) {
+		case *ActionReject:
+			// TODO: send icmp unreachable
+			return nil
+		case *ActionDirect:
+			return E.Append(nil, actionType.WritePacket(buf.As(packet).ToOwned()), func(err error) error {
+				return E.Cause(err, "route ipv4 icmp packet")
+			})
+		}
+	}
 	if header.Type() != clashtcpip.ICMPTypePingRequest || header.Code() != 0 {
 		return nil
 	}
@@ -349,6 +429,21 @@ func (s *System) processIPv4ICMP(packet clashtcpip.IPv4Packet, header clashtcpip
 }
 
 func (s *System) processIPv6ICMP(packet clashtcpip.IPv6Packet, header clashtcpip.ICMPv6Packet) error {
+	if s.router != nil {
+		routeSession := RouteSession{6, clashtcpip.ICMPv6, netip.AddrPortFrom(packet.SourceIP(), 0), netip.AddrPortFrom(packet.DestinationIP(), 0)}
+		action := s.routeMapping.Lookup(routeSession, func() RouteAction {
+			return s.router.RouteConnection(routeSession, &systemICMPDirectPacketWriter6{s.tun, packet.SourceIP()})
+		})
+		switch actionType := action.(type) {
+		case *ActionReject:
+			// TODO: send icmp unreachable
+			return nil
+		case *ActionDirect:
+			return E.Append(nil, actionType.WritePacket(buf.As(packet).ToOwned()), func(err error) error {
+				return E.Cause(err, "route ipv6 icmp packet")
+			})
+		}
+	}
 	if header.Type() != clashtcpip.ICMPv6EchoRequest || header.Code() != 0 {
 		return nil
 	}
@@ -361,13 +456,97 @@ func (s *System) processIPv6ICMP(packet clashtcpip.IPv6Packet, header clashtcpip
 	return common.Error(s.tun.Write(packet))
 }
 
-type systemPacketWriter4 struct {
+type systemTCPDirectPacketWriter4 struct {
+	tun    Tun
+	source netip.AddrPort
+}
+
+func (w *systemTCPDirectPacketWriter4) WritePacket(p []byte) error {
+	packet := clashtcpip.IPv4Packet(p)
+	header := clashtcpip.TCPPacket(packet.Payload())
+	packet.SetDestinationIP(w.source.Addr())
+	header.SetDestinationPort(w.source.Port())
+	header.ResetChecksum(packet.PseudoSum())
+	packet.ResetChecksum()
+	return common.Error(w.tun.Write(packet))
+}
+
+type systemTCPDirectPacketWriter6 struct {
+	tun    Tun
+	source netip.AddrPort
+}
+
+func (w *systemTCPDirectPacketWriter6) WritePacket(p []byte) error {
+	packet := clashtcpip.IPv6Packet(p)
+	header := clashtcpip.TCPPacket(packet.Payload())
+	packet.SetDestinationIP(w.source.Addr())
+	header.SetDestinationPort(w.source.Port())
+	header.ResetChecksum(packet.PseudoSum())
+	packet.ResetChecksum()
+	return common.Error(w.tun.Write(packet))
+}
+
+type systemUDPDirectPacketWriter4 struct {
+	tun    Tun
+	source netip.AddrPort
+}
+
+func (w *systemUDPDirectPacketWriter4) WritePacket(p []byte) error {
+	packet := clashtcpip.IPv4Packet(p)
+	header := clashtcpip.UDPPacket(packet.Payload())
+	packet.SetDestinationIP(w.source.Addr())
+	header.SetDestinationPort(w.source.Port())
+	header.ResetChecksum(packet.PseudoSum())
+	packet.ResetChecksum()
+	return common.Error(w.tun.Write(packet))
+}
+
+type systemUDPDirectPacketWriter6 struct {
+	tun    Tun
+	source netip.AddrPort
+}
+
+func (w *systemUDPDirectPacketWriter6) WritePacket(p []byte) error {
+	packet := clashtcpip.IPv6Packet(p)
+	header := clashtcpip.UDPPacket(packet.Payload())
+	packet.SetDestinationIP(w.source.Addr())
+	header.SetDestinationPort(w.source.Port())
+	header.ResetChecksum(packet.PseudoSum())
+	packet.ResetChecksum()
+	return common.Error(w.tun.Write(packet))
+}
+
+type systemICMPDirectPacketWriter4 struct {
+	tun    Tun
+	source netip.Addr
+}
+
+func (w *systemICMPDirectPacketWriter4) WritePacket(p []byte) error {
+	packet := clashtcpip.IPv4Packet(p)
+	packet.SetDestinationIP(w.source)
+	packet.ResetChecksum()
+	return common.Error(w.tun.Write(packet))
+}
+
+type systemICMPDirectPacketWriter6 struct {
+	tun    Tun
+	source netip.Addr
+}
+
+func (w *systemICMPDirectPacketWriter6) WritePacket(p []byte) error {
+	packet := clashtcpip.IPv6Packet(p)
+	packet.SetDestinationIP(w.source)
+	packet.ResetChecksum()
+	return common.Error(w.tun.Write(packet))
+}
+
+type systemUDPPacketWriter4 struct {
 	tun    Tun
 	header []byte
 	source netip.AddrPort
 }
 
-func (w *systemPacketWriter4) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
+func (w *systemUDPPacketWriter4) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
 	newPacket := buf.StackNewSize(len(w.header) + buffer.Len())
 	defer newPacket.Release()
 	newPacket.Write(w.header)
@@ -385,13 +564,13 @@ func (w *systemPacketWriter4) WritePacket(buffer *buf.Buffer, destination M.Sock
 	return common.Error(w.tun.Write(newPacket.Bytes()))
 }
 
-type systemPacketWriter6 struct {
+type systemUDPPacketWriter6 struct {
 	tun    Tun
 	header []byte
 	source netip.AddrPort
 }
 
-func (w *systemPacketWriter6) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
+func (w *systemUDPPacketWriter6) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
 	newPacket := buf.StackNewSize(len(w.header) + buffer.Len())
 	defer newPacket.Release()
 	newPacket.Write(w.header)

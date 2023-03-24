@@ -10,8 +10,11 @@ var ErrUnknownNetwork = E.New("unknown network")
 
 //goland:noinspection GoNameStartsWithPackageName
 const (
-	NetworkTCP = "tcp"
-	NetworkUDP = "udp"
+	NetworkIP     = "ip"
+	NetworkTCP    = "tcp"
+	NetworkUDP    = "udp"
+	NetworkICMPv4 = "icmpv4"
+	NetworkICMPv6 = "icmpv6"
 )
 
 //goland:noinspection GoNameStartsWithPackageName
@@ -20,6 +23,8 @@ func NetworkName(network string) string {
 		return NetworkTCP
 	} else if strings.HasPrefix(network, "udp") {
 		return NetworkUDP
+	} else if strings.HasPrefix(network, "ip") {
+		return NetworkIP
 	} else {
 		return network
 	}

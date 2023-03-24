@@ -22,6 +22,7 @@ type StackOptions struct {
 	Inet6Address           []netip.Prefix
 	EndpointIndependentNat bool
 	UDPTimeout             int64
+	Router                 Router
 	Handler                Handler
 	Logger                 logger.Logger
 	UnderPlatform          bool

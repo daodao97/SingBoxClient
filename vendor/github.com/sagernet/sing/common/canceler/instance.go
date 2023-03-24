@@ -33,6 +33,15 @@ func (i *Instance) Update() bool {
 	return true
 }
 
+func (i *Instance) Timeout() time.Duration {
+	return i.timeout
+}
+
+func (i *Instance) SetTimeout(timeout time.Duration) {
+	i.timeout = timeout
+	i.Update()
+}
+
 func (i *Instance) wait() {
 	select {
 	case <-i.timer.C:

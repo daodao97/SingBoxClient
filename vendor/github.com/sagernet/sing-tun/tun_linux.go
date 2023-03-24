@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"syscall"
 	"unsafe"
 
 	"github.com/sagernet/netlink"
@@ -383,7 +384,7 @@ func (t *NativeTun) rules() []*netlink.Rule {
 		if p4 {
 			it = netlink.NewRule()
 			it.Priority = priority
-			it.IPProto = unix.IPPROTO_ICMP
+			it.IPProto = syscall.IPPROTO_ICMP
 			it.Goto = nopPriority
 			it.Family = unix.AF_INET
 			rules = append(rules, it)
@@ -392,7 +393,7 @@ func (t *NativeTun) rules() []*netlink.Rule {
 		if p6 {
 			it = netlink.NewRule()
 			it.Priority = priority6
-			it.IPProto = unix.IPPROTO_ICMPV6
+			it.IPProto = syscall.IPPROTO_ICMPV6
 			it.Goto = nopPriority
 			it.Family = unix.AF_INET6
 			rules = append(rules, it)

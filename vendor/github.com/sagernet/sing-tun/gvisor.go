@@ -4,10 +4,14 @@ package tun
 
 import (
 	"context"
+	"net"
+	"syscall"
 	"time"
 
 	"github.com/sagernet/sing/common/bufio"
+	"github.com/sagernet/sing/common/canceler"
 	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/sagernet/sing/common/logger"
 	M "github.com/sagernet/sing/common/metadata"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
@@ -32,9 +36,12 @@ type GVisor struct {
 	tunMtu                 uint32
 	endpointIndependentNat bool
 	udpTimeout             int64
+	router                 Router
 	handler                Handler
+	logger                 logger.Logger
 	stack                  *stack.Stack
 	endpoint               stack.LinkEndpoint
+	routeMapping           *RouteMapping
 }
 
 type GVisorTun interface {
@@ -56,7 +63,10 @@ func NewGVisor(
 		tunMtu:                 options.MTU,
 		endpointIndependentNat: options.EndpointIndependentNat,
 		udpTimeout:             options.UDPTimeout,
+		router:                 options.Router,
 		handler:                options.Handler,
+		logger:                 options.Logger,
+		routeMapping:           NewRouteMapping(options.UDPTimeout),
 	}, nil
 }
 
@@ -103,7 +113,7 @@ func (t *GVisor) Start() error {
 	mOpt := tcpip.TCPModerateReceiveBufferOption(true)
 	ipStack.SetTransportProtocolOption(tcp.ProtocolNumber, &mOpt)
 
-	ipStack.SetTransportProtocolHandler(tcp.ProtocolNumber, tcp.NewForwarder(ipStack, 0, 1024, func(r *tcp.ForwarderRequest) {
+	tcpForwarder := tcp.NewForwarder(ipStack, 0, 1024, func(r *tcp.ForwarderRequest) {
 		var wq waiter.Queue
 		handshakeCtx, cancel := context.WithCancel(context.Background())
 		go func() {
@@ -141,10 +151,47 @@ func (t *GVisor) Start() error {
 				endpoint.Abort()
 			}
 		}()
-	}).HandlePacket)
+	})
+	ipStack.SetTransportProtocolHandler(tcp.ProtocolNumber, func(id stack.TransportEndpointID, buffer *stack.PacketBuffer) bool {
+		if t.router != nil {
+			var routeSession RouteSession
+			routeSession.Network = syscall.IPPROTO_TCP
+			var ipHdr header.Network
+			if buffer.NetworkProtocolNumber == header.IPv4ProtocolNumber {
+				routeSession.IPVersion = 4
+				ipHdr = header.IPv4(buffer.NetworkHeader().Slice())
+			} else {
+				routeSession.IPVersion = 6
+				ipHdr = header.IPv6(buffer.NetworkHeader().Slice())
+			}
+			tcpHdr := header.TCP(buffer.TransportHeader().Slice())
+			routeSession.Source = M.AddrPortFrom(net.IP(ipHdr.SourceAddress()), tcpHdr.SourcePort())
+			routeSession.Destination = M.AddrPortFrom(net.IP(ipHdr.DestinationAddress()), tcpHdr.DestinationPort())
+			action := t.routeMapping.Lookup(routeSession, func() RouteAction {
+				if routeSession.IPVersion == 4 {
+					return t.router.RouteConnection(routeSession, &systemTCPDirectPacketWriter4{t.tun, routeSession.Source})
+				} else {
+					return t.router.RouteConnection(routeSession, &systemTCPDirectPacketWriter6{t.tun, routeSession.Source})
+				}
+			})
+			switch actionType := action.(type) {
+			case *ActionReject:
+				// TODO: send icmp unreachable
+				return true
+			case *ActionDirect:
+				buffer.IncRef()
+				err = actionType.WritePacketBuffer(buffer)
+				if err != nil {
+					t.logger.Trace("route gvisor tcp packet: ", err)
+				}
+				return true
+			}
+		}
+		return tcpForwarder.HandlePacket(id, buffer)
+	})
 
 	if !t.endpointIndependentNat {
-		ipStack.SetTransportProtocolHandler(udp.ProtocolNumber, udp.NewForwarder(ipStack, func(request *udp.ForwarderRequest) {
+		udpForwarder := udp.NewForwarder(ipStack, func(request *udp.ForwarderRequest) {
 			var wq waiter.Queue
 			endpoint, err := request.CreateEndpoint(&wq)
 			if err != nil {
@@ -161,12 +208,50 @@ func (t *GVisor) Start() error {
 				var metadata M.Metadata
 				metadata.Source = M.SocksaddrFromNet(lAddr)
 				metadata.Destination = M.SocksaddrFromNet(rAddr)
-				hErr := t.handler.NewPacketConnection(ContextWithNeedTimeout(t.ctx, true), bufio.NewPacketConn(&bufio.UnbindPacketConn{ExtendedConn: bufio.NewExtendedConn(&gUDPConn{udpConn}), Addr: M.SocksaddrFromNet(rAddr)}), metadata)
+				ctx, conn := canceler.NewPacketConn(t.ctx, bufio.NewPacketConn(&bufio.UnbindPacketConn{ExtendedConn: bufio.NewExtendedConn(&gUDPConn{udpConn}), Addr: M.SocksaddrFromNet(rAddr)}), time.Duration(t.udpTimeout)*time.Second)
+				hErr := t.handler.NewPacketConnection(ctx, conn, metadata)
 				if hErr != nil {
 					endpoint.Abort()
 				}
 			}()
-		}).HandlePacket)
+		})
+		ipStack.SetTransportProtocolHandler(udp.ProtocolNumber, func(id stack.TransportEndpointID, buffer *stack.PacketBuffer) bool {
+			if t.router != nil {
+				var routeSession RouteSession
+				routeSession.Network = syscall.IPPROTO_UDP
+				var ipHdr header.Network
+				if buffer.NetworkProtocolNumber == header.IPv4ProtocolNumber {
+					routeSession.IPVersion = 4
+					ipHdr = header.IPv4(buffer.NetworkHeader().Slice())
+				} else {
+					routeSession.IPVersion = 6
+					ipHdr = header.IPv6(buffer.NetworkHeader().Slice())
+				}
+				udpHdr := header.UDP(buffer.TransportHeader().Slice())
+				routeSession.Source = M.AddrPortFrom(net.IP(ipHdr.SourceAddress()), udpHdr.SourcePort())
+				routeSession.Destination = M.AddrPortFrom(net.IP(ipHdr.DestinationAddress()), udpHdr.DestinationPort())
+				action := t.routeMapping.Lookup(routeSession, func() RouteAction {
+					if routeSession.IPVersion == 4 {
+						return t.router.RouteConnection(routeSession, &systemUDPDirectPacketWriter4{t.tun, routeSession.Source})
+					} else {
+						return t.router.RouteConnection(routeSession, &systemUDPDirectPacketWriter6{t.tun, routeSession.Source})
+					}
+				})
+				switch actionType := action.(type) {
+				case *ActionReject:
+					// TODO: send icmp unreachable
+					return true
+				case *ActionDirect:
+					buffer.IncRef()
+					err = actionType.WritePacketBuffer(buffer)
+					if err != nil {
+						t.logger.Trace("route gvisor udp packet: ", err)
+					}
+					return true
+				}
+			}
+			return udpForwarder.HandlePacket(id, buffer)
+		})
 	} else {
 		ipStack.SetTransportProtocolHandler(udp.ProtocolNumber, NewUDPForwarder(t.ctx, ipStack, t.handler, t.udpTimeout).HandlePacket)
 	}
