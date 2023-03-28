@@ -13,6 +13,7 @@ import (
 	"github.com/sagernet/sing/common/bufio"
 	E "github.com/sagernet/sing/common/exceptions"
 	N "github.com/sagernet/sing/common/network"
+	"github.com/sagernet/sing/common/shell"
 
 	"golang.org/x/net/route"
 	"golang.org/x/sys/unix"
@@ -101,6 +102,7 @@ func (t *NativeTun) Write(p []byte) (n int, err error) {
 }
 
 func (t *NativeTun) Close() error {
+	flushDNSCache()
 	return t.tunFile.Close()
 }
 
@@ -285,6 +287,7 @@ func configure(tunFd int, ifIndex int, name string, options Options) error {
 				}
 			}
 		}
+		flushDNSCache()
 	}
 	return nil
 }
@@ -325,4 +328,8 @@ func addRoute(destination netip.Prefix, gateway netip.Addr) error {
 	return useSocket(unix.AF_ROUTE, unix.SOCK_RAW, 0, func(socketFd int) error {
 		return common.Error(unix.Write(socketFd, request))
 	})
+}
+
+func flushDNSCache() {
+	shell.Exec("dscacheutil", "-flushcache").Start()
 }

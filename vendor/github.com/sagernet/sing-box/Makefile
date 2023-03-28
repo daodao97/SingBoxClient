@@ -80,6 +80,9 @@ test_stdio:
 lib:
 	go run ./cmd/internal/build_libbox
 
+lib_ios:
+	go run ./cmd/internal/build_libbox -target ios
+
 lib_install:
 	go get -v -d
 	go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.0.0-20221130124640-349ebaa752ca

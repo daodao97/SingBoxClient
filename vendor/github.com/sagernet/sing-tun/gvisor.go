@@ -175,7 +175,7 @@ func (t *GVisor) Start() error {
 				}
 			})
 			switch actionType := action.(type) {
-			case *ActionReject:
+			case *ActionBlock:
 				// TODO: send icmp unreachable
 				return true
 			case *ActionDirect:
@@ -238,7 +238,7 @@ func (t *GVisor) Start() error {
 					}
 				})
 				switch actionType := action.(type) {
-				case *ActionReject:
+				case *ActionBlock:
 					// TODO: send icmp unreachable
 					return true
 				case *ActionDirect:

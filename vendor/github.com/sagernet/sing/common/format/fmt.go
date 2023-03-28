@@ -64,11 +64,7 @@ func ToString0[T any](message T) string {
 }
 
 func MapToString[T any](arr []T) []string {
-	// TODO: replace if golangci-lint fixed
-	// return common.Map(arr, ToString0[T])
-	return common.Map(arr, func(it T) string {
-		return ToString(it)
-	})
+	return common.Map(arr, ToString0[T])
 }
 
 func Seconds(seconds float64) string {

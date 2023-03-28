@@ -260,7 +260,7 @@ github.com/sagernet/quic-go/quicvarint
 # github.com/sagernet/reality v0.0.0-20230323230523-5fa25e693e7f
 ## explicit; go 1.18
 github.com/sagernet/reality
-# github.com/sagernet/sing v0.2.1-0.20230323071235-f8038854d286
+# github.com/sagernet/sing v0.2.1
 ## explicit; go 1.18
 github.com/sagernet/sing/common
 github.com/sagernet/sing/common/abx
@@ -373,7 +373,7 @@ github.com/sagernet/sing-shadowsocks/shadowstream
 github.com/sagernet/sing-shadowtls
 github.com/sagernet/sing-shadowtls/tls
 github.com/sagernet/sing-shadowtls/tls_compact
-# github.com/sagernet/sing-tun v0.1.3-0.20230323073325-35d565af6515
+# github.com/sagernet/sing-tun v0.1.4-0.20230326080954-8848c0e4cbab
 ## explicit; go 1.18
 github.com/sagernet/sing-tun
 github.com/sagernet/sing-tun/internal/clashtcpip

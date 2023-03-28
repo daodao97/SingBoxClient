@@ -116,6 +116,10 @@ func (t *NativeTun) configure() error {
 				}
 			}
 		}
+		err := windnsapi.FlushResolverCache()
+		if err != nil {
+			return err
+		}
 	}
 	if len(t.options.Inet4Address) > 0 {
 		inetIf, err := luid.IPInterface(winipcfg.AddressFamily(windows.AF_INET))
@@ -331,11 +335,6 @@ func (t *NativeTun) configure() error {
 		if err != nil {
 			return os.NewSyscallError("FwpmFilterAdd0", err)
 		}
-
-		err = windnsapi.FlushResolverCache()
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -479,7 +478,9 @@ func (t *NativeTun) Close() error {
 		if t.fwpmSession != 0 {
 			winsys.FwpmEngineClose0(t.fwpmSession)
 		}
-		windnsapi.FlushResolverCache()
+		if t.options.AutoRoute {
+			windnsapi.FlushResolverCache()
+		}
 	})
 	return err
 }

@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"os/exec"
 	"runtime"
 	"syscall"
 	"unsafe"
@@ -13,6 +14,7 @@ import (
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/rw"
+	"github.com/sagernet/sing/common/shell"
 	"github.com/sagernet/sing/common/x/list"
 
 	"golang.org/x/sys/unix"
@@ -164,6 +166,8 @@ func (t *NativeTun) configure(tunLink netlink.Link) error {
 		_ = t.unsetRules()
 		return err
 	}
+
+	setSearchDomainForSystemdResolved(t.options.Name)
 
 	if t.options.AutoRoute && runtime.GOOS == "android" {
 		t.interfaceCallback = t.options.InterfaceMonitor.RegisterCallback(t.routeUpdate)
@@ -593,4 +597,12 @@ func (t *NativeTun) routeUpdate(event int) error {
 		return E.Cause(err, "reset route")
 	}
 	return nil
+}
+
+func setSearchDomainForSystemdResolved(interfaceName string) {
+	ctlPath, err := exec.LookPath("resolvectl")
+	if err != nil {
+		return
+	}
+	shell.Exec(ctlPath, "domain", interfaceName, "~.").Run()
 }

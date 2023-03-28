@@ -257,7 +257,7 @@ func (s *System) processIPv4TCP(packet clashtcpip.IPv4Packet, header clashtcpip.
 				return s.router.RouteConnection(session, &systemTCPDirectPacketWriter4{s.tun, source})
 			})
 			switch actionType := action.(type) {
-			case *ActionReject:
+			case *ActionBlock:
 				// TODO: send ICMP unreachable
 				return nil
 			case *ActionDirect:
@@ -298,7 +298,7 @@ func (s *System) processIPv6TCP(packet clashtcpip.IPv6Packet, header clashtcpip.
 				return s.router.RouteConnection(session, &systemTCPDirectPacketWriter6{s.tun, source})
 			})
 			switch actionType := action.(type) {
-			case *ActionReject:
+			case *ActionBlock:
 				// TODO: send RST
 				return nil
 			case *ActionDirect:
@@ -336,7 +336,7 @@ func (s *System) processIPv4UDP(packet clashtcpip.IPv4Packet, header clashtcpip.
 			return s.router.RouteConnection(routeSession, &systemUDPDirectPacketWriter4{s.tun, source})
 		})
 		switch actionType := action.(type) {
-		case *ActionReject:
+		case *ActionBlock:
 			// TODO: send icmp unreachable
 			return nil
 		case *ActionDirect:
@@ -374,7 +374,7 @@ func (s *System) processIPv6UDP(packet clashtcpip.IPv6Packet, header clashtcpip.
 			return s.router.RouteConnection(routeSession, &systemUDPDirectPacketWriter6{s.tun, source})
 		})
 		switch actionType := action.(type) {
-		case *ActionReject:
+		case *ActionBlock:
 			// TODO: send icmp unreachable
 			return nil
 		case *ActionDirect:
@@ -407,7 +407,7 @@ func (s *System) processIPv4ICMP(packet clashtcpip.IPv4Packet, header clashtcpip
 			return s.router.RouteConnection(routeSession, &systemICMPDirectPacketWriter4{s.tun, packet.SourceIP()})
 		})
 		switch actionType := action.(type) {
-		case *ActionReject:
+		case *ActionBlock:
 			// TODO: send icmp unreachable
 			return nil
 		case *ActionDirect:
@@ -435,7 +435,7 @@ func (s *System) processIPv6ICMP(packet clashtcpip.IPv6Packet, header clashtcpip
 			return s.router.RouteConnection(routeSession, &systemICMPDirectPacketWriter6{s.tun, packet.SourceIP()})
 		})
 		switch actionType := action.(type) {
-		case *ActionReject:
+		case *ActionBlock:
 			// TODO: send icmp unreachable
 			return nil
 		case *ActionDirect:

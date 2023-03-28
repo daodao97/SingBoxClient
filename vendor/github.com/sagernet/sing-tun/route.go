@@ -9,8 +9,9 @@ import (
 type ActionType = uint8
 
 const (
-	ActionTypeReturn ActionType = iota
-	ActionTypeReject
+	ActionTypeUnknown ActionType = iota
+	ActionTypeReturn
+	ActionTypeBlock
 	ActionTypeDirect
 )
 
@@ -18,8 +19,8 @@ func ParseActionType(action string) (ActionType, error) {
 	switch action {
 	case "return":
 		return ActionTypeReturn, nil
-	case "reject":
-		return ActionTypeReject, nil
+	case "block":
+		return ActionTypeBlock, nil
 	case "direct":
 		return ActionTypeDirect, nil
 	default:
@@ -27,16 +28,18 @@ func ParseActionType(action string) (ActionType, error) {
 	}
 }
 
-func ActionTypeName(actionType ActionType) string {
+func ActionTypeName(actionType ActionType) (string, error) {
 	switch actionType {
+	case ActionTypeUnknown:
+		return "", nil
 	case ActionTypeReturn:
-		return "return"
-	case ActionTypeReject:
-		return "reject"
+		return "return", nil
+	case ActionTypeBlock:
+		return "block", nil
 	case ActionTypeDirect:
-		return "direct"
+		return "direct", nil
 	default:
-		return "unknown"
+		return "", E.New("unknown action: ", actionType)
 	}
 }
 
@@ -70,13 +73,13 @@ func (r *ActionReturn) Timeout() bool {
 	return false
 }
 
-type ActionReject struct{}
+type ActionBlock struct{}
 
-func (r *ActionReject) ActionType() ActionType {
-	return ActionTypeReject
+func (r *ActionBlock) ActionType() ActionType {
+	return ActionTypeBlock
 }
 
-func (r *ActionReject) Timeout() bool {
+func (r *ActionBlock) Timeout() bool {
 	return false
 }
 
