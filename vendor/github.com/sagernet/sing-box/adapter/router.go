@@ -21,8 +21,13 @@ type Router interface {
 	Outbound(tag string) (Outbound, bool)
 	DefaultOutbound(network string) Outbound
 
+	FakeIPStore() FakeIPStore
+
 	RouteConnection(ctx context.Context, conn net.Conn, metadata InboundContext) error
 	RoutePacketConnection(ctx context.Context, conn N.PacketConn, metadata InboundContext) error
+	RouteIPConnection(ctx context.Context, conn tun.RouteContext, metadata InboundContext) tun.RouteAction
+
+	NatRequired(outbound string) bool
 
 	GeoIPReader() *geoip.Reader
 	LoadGeosite(code string) (Rule, error)
@@ -39,7 +44,9 @@ type Router interface {
 	NetworkMonitor() tun.NetworkUpdateMonitor
 	InterfaceMonitor() tun.DefaultInterfaceMonitor
 	PackageManager() tun.PackageManager
+
 	Rules() []Rule
+	IPRules() []IPRule
 
 	TimeService
 
@@ -76,6 +83,12 @@ type Rule interface {
 type DNSRule interface {
 	Rule
 	DisableCache() bool
+	RewriteTTL() *uint32
+}
+
+type IPRule interface {
+	Rule
+	Action() tun.ActionType
 }
 
 type InterfaceUpdateListener interface {

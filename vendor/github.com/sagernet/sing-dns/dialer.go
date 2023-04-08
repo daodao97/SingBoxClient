@@ -40,7 +40,8 @@ func (d *DialerWrapper) ListenPacket(ctx context.Context, destination M.Socksadd
 	if err != nil {
 		return nil, err
 	}
-	return N.ListenSerial(ctx, d.dialer, destination, addresses)
+	conn, _, err := N.ListenSerial(ctx, d.dialer, destination, addresses)
+	return conn, err
 }
 
 func (d *DialerWrapper) Upstream() any {

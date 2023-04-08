@@ -27,22 +27,24 @@ func init() {
 	dns.RegisterTransport([]string{"h3"}, CreateHTTP3Transport)
 }
 
-func CreateHTTP3Transport(ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (dns.Transport, error) {
+func CreateHTTP3Transport(name string, ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (dns.Transport, error) {
 	linkURL, err := url.Parse(link)
 	if err != nil {
 		return nil, err
 	}
 	linkURL.Scheme = "https"
-	return NewHTTP3Transport(dialer, linkURL.String()), nil
+	return NewHTTP3Transport(name, dialer, linkURL.String()), nil
 }
 
 type HTTP3Transport struct {
+	name        string
 	destination string
 	transport   *http3.RoundTripper
 }
 
-func NewHTTP3Transport(dialer N.Dialer, serverURL string) *HTTP3Transport {
+func NewHTTP3Transport(name string, dialer N.Dialer, serverURL string) *HTTP3Transport {
 	return &HTTP3Transport{
+		name:        name,
 		destination: serverURL,
 		transport: &http3.RoundTripper{
 			Dial: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (quic.EarlyConnection, error) {
@@ -58,6 +60,10 @@ func NewHTTP3Transport(dialer N.Dialer, serverURL string) *HTTP3Transport {
 			},
 		},
 	}
+}
+
+func (t *HTTP3Transport) Name() string {
+	return t.name
 }
 
 func (t *HTTP3Transport) Start() error {

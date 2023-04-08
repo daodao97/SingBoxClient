@@ -31,7 +31,7 @@ func DialSerial(ctx context.Context, dialer Dialer, network string, destination 
 	return nil, E.Errors(connErrors...)
 }
 
-func ListenSerial(ctx context.Context, dialer Dialer, destination M.Socksaddr, destinationAddresses []netip.Addr) (net.PacketConn, error) {
+func ListenSerial(ctx context.Context, dialer Dialer, destination M.Socksaddr, destinationAddresses []netip.Addr) (net.PacketConn, netip.Addr, error) {
 	var conn net.PacketConn
 	var err error
 	var connErrors []error
@@ -41,9 +41,9 @@ func ListenSerial(ctx context.Context, dialer Dialer, destination M.Socksaddr, d
 			connErrors = append(connErrors, err)
 			continue
 		}
-		return conn, nil
+		return conn, address, nil
 	}
-	return nil, E.Errors(connErrors...)
+	return nil, netip.Addr{}, E.Errors(connErrors...)
 }
 
 func DialParallel(ctx context.Context, dialer Dialer, network string, destination M.Socksaddr, destinationAddresses []netip.Addr, preferIPv6 bool, fallbackDelay time.Duration) (net.Conn, error) {

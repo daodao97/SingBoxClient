@@ -23,19 +23,19 @@ func init() {
 	RegisterTransport([]string{"udp", ""}, CreateUDPTransport)
 }
 
-func CreateUDPTransport(ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error) {
+func CreateUDPTransport(name string, ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error) {
 	serverURL, err := url.Parse(link)
 	if err != nil || serverURL.Scheme == "" {
-		return NewUDPTransport(ctx, dialer, M.ParseSocksaddr(link))
+		return NewUDPTransport(name, ctx, dialer, M.ParseSocksaddr(link))
 	}
-	return NewUDPTransport(ctx, dialer, M.ParseSocksaddr(serverURL.Host))
+	return NewUDPTransport(name, ctx, dialer, M.ParseSocksaddr(serverURL.Host))
 }
 
 type UDPTransport struct {
 	myTransportAdapter
 }
 
-func NewUDPTransport(ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr) (*UDPTransport, error) {
+func NewUDPTransport(name string, ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr) (*UDPTransport, error) {
 	if !serverAddr.IsValid() {
 		return nil, E.New("invalid server address")
 	}
@@ -43,7 +43,7 @@ func NewUDPTransport(ctx context.Context, dialer N.Dialer, serverAddr M.Socksadd
 		serverAddr.Port = 53
 	}
 	transport := &UDPTransport{
-		newAdapter(ctx, dialer, serverAddr),
+		newAdapter(name, ctx, dialer, serverAddr),
 	}
 	transport.handler = transport
 	return transport, nil

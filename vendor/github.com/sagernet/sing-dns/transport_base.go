@@ -23,6 +23,7 @@ type myTransportHandler interface {
 }
 
 type myTransportAdapter struct {
+	name       string
 	ctx        context.Context
 	cancel     context.CancelFunc
 	dialer     N.Dialer
@@ -32,14 +33,19 @@ type myTransportAdapter struct {
 	conn       *dnsConnection
 }
 
-func newAdapter(ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr) myTransportAdapter {
+func newAdapter(name string, ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr) myTransportAdapter {
 	ctx, cancel := context.WithCancel(ctx)
 	return myTransportAdapter{
+		name:       name,
 		ctx:        ctx,
 		cancel:     cancel,
 		dialer:     dialer,
 		serverAddr: serverAddr,
 	}
+}
+
+func (t *myTransportAdapter) Name() string {
+	return t.name
 }
 
 func (t *myTransportAdapter) Start() error {
@@ -99,6 +105,7 @@ func (t *myTransportAdapter) recvLoop(conn *dnsConnection) {
 		}
 	})
 	group.Cleanup(func() {
+		conn.cancel()
 		conn.Close()
 	})
 	group.Run(conn.ctx)
@@ -122,7 +129,7 @@ func (t *myTransportAdapter) Exchange(ctx context.Context, message *dns.Msg) (*d
 }
 
 func (t *myTransportAdapter) exchange(ctx context.Context, message *dns.Msg) (*dns.Msg, error) {
-	conn, err := t.open(ctx)
+	conn, err := t.open(t.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -159,11 +166,10 @@ func (t *myTransportAdapter) cleanup(conn *dnsConnection, messageId uint16, call
 }
 
 func (t *myTransportAdapter) Close() error {
-	t.access.Lock()
-	defer t.access.Unlock()
-	if t.conn != nil {
-		t.conn.cancel()
-		t.conn.Close()
+	conn := t.conn
+	if conn != nil {
+		conn.cancel()
+		conn.Close()
 	}
 	return nil
 }

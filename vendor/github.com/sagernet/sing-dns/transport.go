@@ -12,9 +12,10 @@ import (
 	"github.com/miekg/dns"
 )
 
-type TransportConstructor = func(ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error)
+type TransportConstructor = func(name string, ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error)
 
 type Transport interface {
+	Name() string
 	Start() error
 	Close() error
 	Raw() bool
@@ -33,7 +34,7 @@ func RegisterTransport(schemes []string, constructor TransportConstructor) {
 	}
 }
 
-func CreateTransport(ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, address string) (Transport, error) {
+func CreateTransport(name string, ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, address string) (Transport, error) {
 	constructor := transports[address]
 	if constructor == nil {
 		serverURL, _ := url.Parse(address)
@@ -46,5 +47,5 @@ func CreateTransport(ctx context.Context, logger logger.ContextLogger, dialer N.
 	if constructor == nil {
 		return nil, E.New("unknown DNS server format: " + address)
 	}
-	return constructor(ctx, logger, dialer, address)
+	return constructor(name, contextWithTransportName(ctx, name), logger, dialer, address)
 }

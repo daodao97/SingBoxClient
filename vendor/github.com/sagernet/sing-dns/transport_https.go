@@ -22,6 +22,7 @@ const MimeType = "application/dns-message"
 var _ Transport = (*HTTPSTransport)(nil)
 
 type HTTPSTransport struct {
+	name        string
 	destination string
 	transport   *http.Transport
 }
@@ -30,12 +31,13 @@ func init() {
 	RegisterTransport([]string{"https"}, CreateHTTPSTransport)
 }
 
-func CreateHTTPSTransport(ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error) {
-	return NewHTTPSTransport(dialer, link), nil
+func CreateHTTPSTransport(name string, ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error) {
+	return NewHTTPSTransport(name, dialer, link), nil
 }
 
-func NewHTTPSTransport(dialer N.Dialer, serverURL string) *HTTPSTransport {
+func NewHTTPSTransport(name string, dialer N.Dialer, serverURL string) *HTTPSTransport {
 	return &HTTPSTransport{
+		name:        name,
 		destination: serverURL,
 		transport: &http.Transport{
 			ForceAttemptHTTP2: true,
@@ -47,6 +49,10 @@ func NewHTTPSTransport(dialer N.Dialer, serverURL string) *HTTPSTransport {
 			},
 		},
 	}
+}
+
+func (t *HTTPSTransport) Name() string {
+	return t.name
 }
 
 func (t *HTTPSTransport) Start() error {

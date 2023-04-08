@@ -19,24 +19,30 @@ func init() {
 	RegisterTransport([]string{"local"}, CreateLocalTransport)
 }
 
-func CreateLocalTransport(ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error) {
-	return NewLocalTransport(dialer), nil
+func CreateLocalTransport(name string, ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error) {
+	return NewLocalTransport(name, dialer), nil
 }
 
 var _ Transport = (*LocalTransport)(nil)
 
 type LocalTransport struct {
+	name     string
 	resolver net.Resolver
 }
 
-func NewLocalTransport(dialer N.Dialer) *LocalTransport {
+func NewLocalTransport(name string, dialer N.Dialer) *LocalTransport {
 	return &LocalTransport{
+		name: name,
 		resolver: net.Resolver{
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 				return dialer.DialContext(ctx, N.NetworkName(network), M.ParseSocksaddr(address))
 			},
 		},
 	}
+}
+
+func (t *LocalTransport) Name() string {
+	return t.name
 }
 
 func (t *LocalTransport) Start() error {

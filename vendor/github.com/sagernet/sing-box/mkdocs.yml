@@ -38,8 +38,8 @@ nav:
   - Installation:
       - From source: installation/from-source.md
       - Clients:
-          - SFI:
-            - installation/clients/sfi/index.md
+          - iOS: installation/clients/sfi.md
+          - Android: installation/clients/sfa.md
   - Configuration:
       - configuration/index.md
       - Log:
@@ -48,12 +48,14 @@ nav:
           - configuration/dns/index.md
           - DNS Server: configuration/dns/server.md
           - DNS Rule: configuration/dns/rule.md
+          - FakeIP: configuration/dns/fakeip.md
       - NTP:
           - configuration/ntp/index.md
       - Route:
           - configuration/route/index.md
           - GeoIP: configuration/route/geoip.md
           - Geosite: configuration/route/geosite.md
+          - IP Route Rule: configuration/route/ip-rule.md
           - Route Rule: configuration/route/rule.md
           - Protocol Sniff: configuration/route/sniff.md
       - Experimental:
@@ -102,6 +104,7 @@ nav:
           - URLTest: configuration/outbound/urltest.md
   - FAQ:
       - faq/index.md
+      - FakeIP: faq/fakeip.md
       - Known Issues: faq/known-issues.md
   - Examples:
       - examples/index.md
@@ -111,6 +114,7 @@ nav:
       - Shadowsocks: examples/shadowsocks.md
       - ShadowTLS: examples/shadowtls.md
       - Clash API: examples/clash-api.md
+      - WireGuard Direct: examples/wireguard-direct.md
   - Contributing:
       - contributing/index.md
       - Developing:
@@ -169,6 +173,7 @@ plugins:
           DNS Rule: DNS 规则
 
           Route: 路由
+          IP Route Rule: IP 路由规则
           Route Rule: 路由规则
           Protocol Sniff: 协议探测
 

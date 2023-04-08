@@ -22,19 +22,19 @@ func init() {
 	RegisterTransport([]string{"tcp"}, CreateTCPTransport)
 }
 
-func CreateTCPTransport(ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error) {
+func CreateTCPTransport(name string, ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error) {
 	serverURL, err := url.Parse(link)
 	if err != nil {
 		return nil, err
 	}
-	return NewTCPTransport(ctx, dialer, M.ParseSocksaddr(serverURL.Host))
+	return NewTCPTransport(name, ctx, dialer, M.ParseSocksaddr(serverURL.Host))
 }
 
 type TCPTransport struct {
 	myTransportAdapter
 }
 
-func NewTCPTransport(ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr) (*TCPTransport, error) {
+func NewTCPTransport(name string, ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr) (*TCPTransport, error) {
 	if !serverAddr.IsValid() {
 		return nil, E.New("invalid server address")
 	}
@@ -42,7 +42,7 @@ func NewTCPTransport(ctx context.Context, dialer N.Dialer, serverAddr M.Socksadd
 		serverAddr.Port = 53
 	}
 	transport := &TCPTransport{
-		newAdapter(ctx, dialer, serverAddr),
+		newAdapter(name, ctx, dialer, serverAddr),
 	}
 	transport.handler = transport
 	return transport, nil

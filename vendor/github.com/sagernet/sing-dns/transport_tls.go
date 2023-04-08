@@ -23,19 +23,19 @@ func init() {
 	RegisterTransport([]string{"tls"}, CreateTLSTransport)
 }
 
-func CreateTLSTransport(ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error) {
+func CreateTLSTransport(name string, ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (Transport, error) {
 	serverURL, err := url.Parse(link)
 	if err != nil {
 		return nil, err
 	}
-	return NewTLSTransport(ctx, dialer, M.ParseSocksaddr(serverURL.Host))
+	return NewTLSTransport(name, ctx, dialer, M.ParseSocksaddr(serverURL.Host))
 }
 
 type TLSTransport struct {
 	myTransportAdapter
 }
 
-func NewTLSTransport(ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr) (*TLSTransport, error) {
+func NewTLSTransport(name string, ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr) (*TLSTransport, error) {
 	if !serverAddr.IsValid() {
 		return nil, E.New("invalid server address")
 	}
@@ -43,7 +43,7 @@ func NewTLSTransport(ctx context.Context, dialer N.Dialer, serverAddr M.Socksadd
 		serverAddr.Port = 853
 	}
 	transport := &TLSTransport{
-		newAdapter(ctx, dialer, serverAddr),
+		newAdapter(name, ctx, dialer, serverAddr),
 	}
 	transport.handler = transport
 	return transport, nil

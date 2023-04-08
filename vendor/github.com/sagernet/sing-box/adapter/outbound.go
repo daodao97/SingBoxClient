@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 
+	"github.com/sagernet/sing-tun"
 	N "github.com/sagernet/sing/common/network"
 )
 
@@ -20,4 +21,9 @@ type Outbound interface {
 
 type Delay interface {
 	Delay() (uint16, error)
+}
+
+type IPOutbound interface {
+	Outbound
+	NewIPConnection(ctx context.Context, conn tun.RouteContext, metadata InboundContext) (tun.DirectDestination, error)
 }

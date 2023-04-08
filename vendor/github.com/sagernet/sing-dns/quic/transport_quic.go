@@ -29,15 +29,16 @@ func init() {
 	dns.RegisterTransport([]string{"quic"}, CreateTransport)
 }
 
-func CreateTransport(ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (dns.Transport, error) {
+func CreateTransport(name string, ctx context.Context, logger logger.ContextLogger, dialer N.Dialer, link string) (dns.Transport, error) {
 	serverURL, err := url.Parse(link)
 	if err != nil {
 		return nil, err
 	}
-	return NewTransport(ctx, dialer, M.ParseSocksaddr(serverURL.Host))
+	return NewTransport(name, ctx, dialer, M.ParseSocksaddr(serverURL.Host))
 }
 
 type Transport struct {
+	name       string
 	ctx        context.Context
 	dialer     N.Dialer
 	serverAddr M.Socksaddr
@@ -46,7 +47,7 @@ type Transport struct {
 	connection quic.EarlyConnection
 }
 
-func NewTransport(ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr) (*Transport, error) {
+func NewTransport(name string, ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr) (*Transport, error) {
 	if !serverAddr.IsValid() {
 		return nil, E.New("invalid server address")
 	}
@@ -54,10 +55,15 @@ func NewTransport(ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr) 
 		serverAddr.Port = 853
 	}
 	return &Transport{
+		name:       name,
 		ctx:        ctx,
 		dialer:     dialer,
 		serverAddr: serverAddr,
 	}, nil
+}
+
+func (t *Transport) Name() string {
+	return t.name
 }
 
 func (t *Transport) Start() error {

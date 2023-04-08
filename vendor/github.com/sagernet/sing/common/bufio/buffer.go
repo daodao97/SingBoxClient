@@ -23,6 +23,9 @@ func NewBufferedReader(upstream io.Reader, buffer *buf.Buffer) *BufferedReader {
 }
 
 func (r *BufferedReader) Read(p []byte) (n int, err error) {
+	if r.buffer == nil {
+		return r.upstream.Read(p)
+	}
 	if r.buffer.Closed() {
 		return 0, os.ErrClosed
 	}
@@ -38,6 +41,9 @@ func (r *BufferedReader) Read(p []byte) (n int, err error) {
 }
 
 func (r *BufferedReader) ReadBuffer(buffer *buf.Buffer) error {
+	if r.buffer == nil {
+		return r.upstream.ReadBuffer(buffer)
+	}
 	if r.buffer.Closed() {
 		return os.ErrClosed
 	}
@@ -62,6 +68,9 @@ func (r *BufferedReader) ReadBuffer(buffer *buf.Buffer) error {
 }
 
 func (r *BufferedReader) WriteTo(w io.Writer) (n int64, err error) {
+	if r.buffer == nil {
+		return Copy(w, r.upstream)
+	}
 	if r.buffer.Closed() {
 		return 0, os.ErrClosed
 	}
@@ -69,8 +78,25 @@ func (r *BufferedReader) WriteTo(w io.Writer) (n int64, err error) {
 	return CopyExtendedBuffer(NewExtendedWriter(w), NewExtendedReader(r.upstream), r.buffer)
 }
 
+func (r *BufferedReader) ReadCached() *buf.Buffer {
+	buffer := r.buffer
+	r.buffer = nil
+	return buffer
+}
+
+func (r *BufferedReader) Close() error {
+	r.buffer.Release()
+	r.buffer = nil
+	return nil
+}
+
 func (r *BufferedReader) Upstream() any {
 	return r.upstream
+}
+
+func (r *BufferedReader) ReaderReplaceable() bool {
+	buffer := r.buffer
+	return buffer == nil || buffer.Closed()
 }
 
 type BufferedWriter struct {

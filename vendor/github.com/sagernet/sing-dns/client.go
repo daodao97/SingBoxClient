@@ -44,6 +44,21 @@ func NewClient(disableCache bool, disableExpire bool, logger logger.ContextLogge
 }
 
 func (c *Client) Exchange(ctx context.Context, transport Transport, message *dns.Msg, strategy DomainStrategy) (*dns.Msg, error) {
+	response, err := c.exchange(ctx, transport, message, strategy)
+	if err != nil {
+		return nil, err
+	}
+	if rewriteTTL, loaded := RewriteTTLFromContext(ctx); loaded {
+		for _, recordList := range [][]dns.RR{response.Answer, response.Ns, response.Extra} {
+			for _, record := range recordList {
+				record.Header().Ttl = rewriteTTL
+			}
+		}
+	}
+	return response, nil
+}
+
+func (c *Client) exchange(ctx context.Context, transport Transport, message *dns.Msg, strategy DomainStrategy) (*dns.Msg, error) {
 	if len(message.Question) != 1 {
 		if c.logger != nil {
 			c.logger.WarnContext(ctx, "bad question size: ", len(message.Question))
@@ -68,12 +83,6 @@ func (c *Client) Exchange(ctx context.Context, transport Transport, message *dns
 			return response, nil
 		}
 	}
-	if !transport.Raw() {
-		if question.Qtype == dns.TypeA || question.Qtype == dns.TypeAAAA {
-			return c.exchangeToLookup(ctx, transport, message, question)
-		}
-		return nil, ErrNoRawSupport
-	}
 	if question.Qtype == dns.TypeA && strategy == DomainStrategyUseIPv6 || question.Qtype == dns.TypeAAAA && strategy == DomainStrategyUseIPv4 {
 		responseMessage := dns.Msg{
 			MsgHdr: dns.MsgHdr{
@@ -88,15 +97,26 @@ func (c *Client) Exchange(ctx context.Context, transport Transport, message *dns
 		}
 		return &responseMessage, nil
 	}
+	if !transport.Raw() {
+		if question.Qtype == dns.TypeA || question.Qtype == dns.TypeAAAA {
+			return c.exchangeToLookup(ctx, transport, message, question)
+		}
+		return nil, ErrNoRawSupport
+	}
 	messageId := message.Id
+	contextTransport, loaded := transportNameFromContext(ctx)
+	if loaded && transport.Name() == contextTransport {
+		return nil, E.New("DNS query loopback in transport[", contextTransport, "]")
+	}
+	ctx = contextWithTransportName(ctx, transport.Name())
 	response, err := transport.Exchange(ctx, message)
 	if err != nil {
 		return nil, err
 	}
 	var timeToLive int
-	for _, recordList := range [][]dns.RR{message.Answer, message.Ns, message.Extra} {
+	for _, recordList := range [][]dns.RR{response.Answer, response.Ns, response.Extra} {
 		for _, record := range recordList {
-			if timeToLive == 0 || int(record.Header().Ttl) < timeToLive {
+			if timeToLive == 0 || record.Header().Ttl > 0 && int(record.Header().Ttl) < timeToLive {
 				timeToLive = int(record.Header().Ttl)
 			}
 		}
@@ -104,7 +124,6 @@ func (c *Client) Exchange(ctx context.Context, transport Transport, message *dns
 	if timeToLive == 0 {
 		timeToLive = DefaultTTL
 	}
-
 	logExchangedResponse(c.logger, ctx, response, timeToLive)
 
 	response.Id = messageId
@@ -308,6 +327,12 @@ func (c *Client) exchangeToLookup(ctx context.Context, transport Transport, mess
 		},
 		Question: message.Question,
 	}
+	var timeToLive uint32
+	if rewriteTTL, loaded := RewriteTTLFromContext(ctx); loaded {
+		timeToLive = rewriteTTL
+	} else {
+		timeToLive = DefaultTTL
+	}
 	for _, address := range result {
 		if address.Is4In6() {
 			address = netip.AddrFrom4(address.As4())
@@ -318,7 +343,7 @@ func (c *Client) exchangeToLookup(ctx context.Context, transport Transport, mess
 					Name:   question.Name,
 					Rrtype: dns.TypeA,
 					Class:  dns.ClassINET,
-					Ttl:    DefaultTTL,
+					Ttl:    timeToLive,
 				},
 				A: address.AsSlice(),
 			})
@@ -328,7 +353,7 @@ func (c *Client) exchangeToLookup(ctx context.Context, transport Transport, mess
 					Name:   question.Name,
 					Rrtype: dns.TypeAAAA,
 					Class:  dns.ClassINET,
-					Ttl:    DefaultTTL,
+					Ttl:    timeToLive,
 				},
 				AAAA: address.AsSlice(),
 			})
@@ -388,18 +413,38 @@ func (c *Client) loadResponse(question dns.Question) (*dns.Msg, int) {
 			c.cache.Delete(question)
 			return nil, 0
 		}
-		ttl := int(expireAt.Sub(timeNow).Seconds())
-		if ttl < 0 {
-			ttl = 0
+		var originTTL int
+		for _, recordList := range [][]dns.RR{cachedAnswer.Answer, cachedAnswer.Ns, cachedAnswer.Extra} {
+			for _, record := range recordList {
+				if originTTL == 0 || record.Header().Ttl > 0 && int(record.Header().Ttl) < originTTL {
+					originTTL = int(record.Header().Ttl)
+				}
+			}
+		}
+		nowTTL := int(expireAt.Sub(timeNow).Seconds())
+		if nowTTL < 0 {
+			nowTTL = 0
 		}
 		response := cachedAnswer.Copy()
-		for _, rr := range response.Answer {
-			rr.Header().Ttl = uint32(ttl)
+		if originTTL > 0 {
+			duration := uint32(originTTL - nowTTL)
+			for _, recordList := range [][]dns.RR{response.Answer, response.Ns, response.Extra} {
+				for _, record := range recordList {
+					newTTL := record.Header().Ttl - duration
+					if newTTL < 0 {
+						newTTL = 0
+					}
+					record.Header().Ttl = newTTL
+				}
+			}
+		} else {
+			for _, recordList := range [][]dns.RR{response.Answer, response.Ns, response.Extra} {
+				for _, record := range recordList {
+					record.Header().Ttl = uint32(nowTTL)
+				}
+			}
 		}
-		for _, rr := range response.Ns {
-			rr.Header().Ttl = uint32(ttl)
-		}
-		return response, ttl
+		return response, nowTTL
 	}
 }
 

@@ -142,7 +142,7 @@ github.com/google/pprof/profile
 # github.com/hashicorp/yamux v0.1.1
 ## explicit; go 1.15
 github.com/hashicorp/yamux
-# github.com/insomniacslk/dhcp v0.0.0-20230307103557-e252950ab961
+# github.com/insomniacslk/dhcp v0.0.0-20230327135226-74ae03f2425e
 ## explicit; go 1.18
 github.com/insomniacslk/dhcp/dhcpv4
 github.com/insomniacslk/dhcp/iana
@@ -173,7 +173,7 @@ github.com/logrusorgru/aurora
 ## explicit; go 1.18
 github.com/mholt/acmez
 github.com/mholt/acmez/acme
-# github.com/miekg/dns v1.1.52
+# github.com/miekg/dns v1.1.53
 ## explicit; go 1.19
 github.com/miekg/dns
 # github.com/onsi/ginkgo/v2 v2.2.0
@@ -257,10 +257,10 @@ github.com/sagernet/quic-go/internal/utils/linkedlist
 github.com/sagernet/quic-go/internal/wire
 github.com/sagernet/quic-go/logging
 github.com/sagernet/quic-go/quicvarint
-# github.com/sagernet/reality v0.0.0-20230323230523-5fa25e693e7f
+# github.com/sagernet/reality v0.0.0-20230406110435-ee17307e7691
 ## explicit; go 1.18
 github.com/sagernet/reality
-# github.com/sagernet/sing v0.2.1
+# github.com/sagernet/sing v0.2.2-0.20230407053809-308e421e33c2
 ## explicit; go 1.18
 github.com/sagernet/sing/common
 github.com/sagernet/sing/common/abx
@@ -344,6 +344,7 @@ github.com/sagernet/sing-box/route
 github.com/sagernet/sing-box/transport/clashssr/obfs
 github.com/sagernet/sing-box/transport/clashssr/protocol
 github.com/sagernet/sing-box/transport/dhcp
+github.com/sagernet/sing-box/transport/fakeip
 github.com/sagernet/sing-box/transport/hysteria
 github.com/sagernet/sing-box/transport/simple-obfs
 github.com/sagernet/sing-box/transport/sip003
@@ -357,7 +358,7 @@ github.com/sagernet/sing-box/transport/v2rayquic
 github.com/sagernet/sing-box/transport/v2raywebsocket
 github.com/sagernet/sing-box/transport/vless
 github.com/sagernet/sing-box/transport/wireguard
-# github.com/sagernet/sing-dns v0.1.4
+# github.com/sagernet/sing-dns v0.1.5-0.20230408004833-5adaf486d440
 ## explicit; go 1.18
 github.com/sagernet/sing-dns
 github.com/sagernet/sing-dns/quic
@@ -480,7 +481,7 @@ golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/modfile
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.8.0
+# golang.org/x/net v0.9.0
 ## explicit; go 1.17
 golang.org/x/net/bpf
 golang.org/x/net/http/httpguts
@@ -497,7 +498,7 @@ golang.org/x/net/ipv6
 golang.org/x/net/proxy
 golang.org/x/net/route
 golang.org/x/net/trace
-# golang.org/x/sys v0.6.0
+# golang.org/x/sys v0.7.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
@@ -505,7 +506,7 @@ golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/text v0.8.0
+# golang.org/x/text v0.9.0
 ## explicit; go 1.17
 golang.org/x/text/runes
 golang.org/x/text/secure/bidirule

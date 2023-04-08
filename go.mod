@@ -40,14 +40,14 @@ require (
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
-	github.com/insomniacslk/dhcp v0.0.0-20230307103557-e252950ab961 // indirect
+	github.com/insomniacslk/dhcp v0.0.0-20230327135226-74ae03f2425e // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/klauspost/cpuid/v2 v2.1.1 // indirect
 	github.com/libdns/libdns v0.2.1 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/mholt/acmez v1.1.0 // indirect
-	github.com/miekg/dns v1.1.52 // indirect
+	github.com/miekg/dns v1.1.53 // indirect
 	github.com/onsi/ginkgo/v2 v2.2.0 // indirect
 	github.com/ooni/go-libtor v1.1.7 // indirect
 	github.com/oschwald/maxminddb-golang v1.10.0 // indirect
@@ -62,9 +62,9 @@ require (
 	github.com/sagernet/go-tun2socks v1.16.12-0.20220818015926-16cb67876a61 // indirect
 	github.com/sagernet/netlink v0.0.0-20220905062125-8043b4a9aa97 // indirect
 	github.com/sagernet/quic-go v0.0.0-20230202071646-a8c8afb18b32 // indirect
-	github.com/sagernet/reality v0.0.0-20230323230523-5fa25e693e7f // indirect
-	github.com/sagernet/sing v0.2.1 // indirect
-	github.com/sagernet/sing-dns v0.1.4 // indirect
+	github.com/sagernet/reality v0.0.0-20230406110435-ee17307e7691 // indirect
+	github.com/sagernet/sing v0.2.2-0.20230407053809-308e421e33c2 // indirect
+	github.com/sagernet/sing-dns v0.1.5-0.20230408004833-5adaf486d440 // indirect
 	github.com/sagernet/sing-shadowsocks v0.2.0 // indirect
 	github.com/sagernet/sing-shadowtls v0.1.0 // indirect
 	github.com/sagernet/sing-tun v0.1.4-0.20230326080954-8848c0e4cbab // indirect
@@ -85,9 +85,9 @@ require (
 	golang.org/x/crypto v0.7.0 // indirect
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29 // indirect
 	golang.org/x/mod v0.8.0 // indirect
-	golang.org/x/net v0.8.0 // indirect
-	golang.org/x/sys v0.6.0 // indirect
-	golang.org/x/text v0.8.0 // indirect
+	golang.org/x/net v0.9.0 // indirect
+	golang.org/x/sys v0.7.0 // indirect
+	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	golang.org/x/tools v0.6.0 // indirect
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect

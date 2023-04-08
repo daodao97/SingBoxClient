@@ -301,7 +301,7 @@ func (s *Provider) parseProvider(ctx context.Context, content []byte) error {
 	}
 
 	for _, v := range outbounds {
-		detour, err := New(ctx, s.router, s.logger, v)
+		detour, err := New(ctx, s.router, s.logger, "direct", v)
 		if err != nil {
 			return E.Extend(err, "New.outbound")
 		}

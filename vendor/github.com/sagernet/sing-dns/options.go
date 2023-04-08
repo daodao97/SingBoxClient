@@ -15,3 +15,17 @@ func DisableCacheFromContext(ctx context.Context) bool {
 	}
 	return val.(bool)
 }
+
+type rewriteTTLKey struct{}
+
+func ContextWithRewriteTTL(ctx context.Context, val uint32) context.Context {
+	return context.WithValue(ctx, (*rewriteTTLKey)(nil), val)
+}
+
+func RewriteTTLFromContext(ctx context.Context) (uint32, bool) {
+	val := ctx.Value((*rewriteTTLKey)(nil))
+	if val == nil {
+		return 0, false
+	}
+	return val.(uint32), true
+}
