@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/convert"
 	"github.com/sagernet/sing-box/common/json"
@@ -218,6 +219,8 @@ func (s *Provider) updateSelected(outboundMap map[string]adapter.Outbound) error
 			outbounds = append(outbounds, v)
 		}
 
+		s.logger.Debug("NewURLTestGroup ", len(outbounds))
+
 		s.group = NewURLTestGroup(s.router, s.logger, outbounds, s.urlTest.Url, interval, 100)
 		err = s.group.Start()
 		if err != nil {
@@ -301,16 +304,18 @@ func (s *Provider) parseProvider(ctx context.Context, content []byte) error {
 	}
 
 	for _, v := range outbounds {
-		detour, err := New(ctx, s.router, s.logger, "direct", v)
+		detour, err := New(ctx, s.router, s.logger, v.Tag, v)
 		if err != nil {
 			return E.Extend(err, "New.outbound")
 		}
 
 		if len(s.includeKeyWords) > 0 && miss(detour.Tag(), s.includeKeyWords) {
+			s.logger.Debug("parseProvider filter by includeKeyWords ", detour.Tag())
 			continue
 		}
 
 		if len(s.excludeKeyWords) > 0 && match(detour.Tag(), s.excludeKeyWords) {
+			s.logger.Debug("parseProvider filter by excludeKeyWords ", detour.Tag())
 			continue
 		}
 
@@ -318,6 +323,10 @@ func (s *Provider) parseProvider(ctx context.Context, content []byte) error {
 		s.tags = append(s.tags, detour.Tag())
 		s.tags = arrUnique(s.tags)
 
+	}
+
+	if len(s.outbounds) == 0 {
+		s.logger.Error("parseContent outbounds ", len(outbounds), " -> ", len(s.outbounds), fmt.Sprintf(" %v %v", s.includeKeyWords, s.excludeKeyWords))
 	}
 
 	err = s.updateSelected(s.outbounds)
