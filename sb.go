@@ -76,7 +76,11 @@ func create(configPath string) (*box.Box, context.CancelFunc, error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	instance, err := box.New(ctx, options, nil)
+	instance, err := box.New(box.Options{
+		Options:           options,
+		Context:           ctx,
+		PlatformInterface: nil,
+	})
 	if err != nil {
 		cancel()
 		return nil, nil, errors.Wrap(err, "sing-box core create service")
