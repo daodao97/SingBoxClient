@@ -3,6 +3,9 @@ package batch
 import (
 	"context"
 	"sync"
+
+	"github.com/sagernet/sing/common"
+	E "github.com/sagernet/sing/common/exceptions"
 )
 
 type Option[T any] func(b *Batch[T])
@@ -15,6 +18,10 @@ type Result[T any] struct {
 type Error struct {
 	Key string
 	Err error
+}
+
+func (e *Error) Error() string {
+	return E.Cause(e.Err, e.Key).Error()
 }
 
 func WithConcurrencyNum[T any](n int) Option[T] {
@@ -35,7 +42,7 @@ type Batch[T any] struct {
 	mux    sync.Mutex
 	err    *Error
 	once   sync.Once
-	cancel func()
+	cancel common.ContextCancelCauseFunc
 }
 
 func (b *Batch[T]) Go(key string, fn func() (T, error)) {
@@ -54,7 +61,7 @@ func (b *Batch[T]) Go(key string, fn func() (T, error)) {
 			b.once.Do(func() {
 				b.err = &Error{key, err}
 				if b.cancel != nil {
-					b.cancel()
+					b.cancel(b.err)
 				}
 			})
 		}
@@ -69,7 +76,7 @@ func (b *Batch[T]) Go(key string, fn func() (T, error)) {
 func (b *Batch[T]) Wait() *Error {
 	b.wg.Wait()
 	if b.cancel != nil {
-		b.cancel()
+		b.cancel(nil)
 	}
 	return b.err
 }
@@ -90,7 +97,7 @@ func (b *Batch[T]) Result() map[string]Result[T] {
 }
 
 func New[T any](ctx context.Context, opts ...Option[T]) (*Batch[T], context.Context) {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := common.ContextWithCancelCause(ctx)
 
 	b := &Batch[T]{
 		result: map[string]Result[T]{},

@@ -2,17 +2,21 @@ package canceler
 
 import (
 	"context"
+	"net"
+	"os"
 	"time"
+
+	"github.com/sagernet/sing/common"
 )
 
 type Instance struct {
 	ctx        context.Context
-	cancelFunc context.CancelFunc
+	cancelFunc common.ContextCancelCauseFunc
 	timer      *time.Timer
 	timeout    time.Duration
 }
 
-func New(ctx context.Context, cancelFunc context.CancelFunc, timeout time.Duration) *Instance {
+func New(ctx context.Context, cancelFunc common.ContextCancelCauseFunc, timeout time.Duration) *Instance {
 	instance := &Instance{
 		ctx,
 		cancelFunc,
@@ -47,11 +51,15 @@ func (i *Instance) wait() {
 	case <-i.timer.C:
 	case <-i.ctx.Done():
 	}
-	i.Close()
+	i.CloseWithError(os.ErrDeadlineExceeded)
 }
 
 func (i *Instance) Close() error {
-	i.timer.Stop()
-	i.cancelFunc()
+	i.CloseWithError(net.ErrClosed)
 	return nil
+}
+
+func (i *Instance) CloseWithError(err error) {
+	i.timer.Stop()
+	i.cancelFunc(err)
 }

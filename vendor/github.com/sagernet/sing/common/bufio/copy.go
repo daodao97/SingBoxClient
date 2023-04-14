@@ -185,6 +185,10 @@ func CopyExtendedWithPool(dst N.ExtendedWriter, src N.ExtendedReader) (n int64, 
 }
 
 func CopyConn(ctx context.Context, conn net.Conn, dest net.Conn) error {
+	return CopyConnContextList([]context.Context{ctx}, conn, dest)
+}
+
+func CopyConnContextList(contextList []context.Context, conn net.Conn, dest net.Conn) error {
 	var group task.Group
 	if _, dstDuplex := common.Cast[rw.WriteCloser](dest); dstDuplex {
 		group.Append("upload", func(ctx context.Context) error {
@@ -221,7 +225,7 @@ func CopyConn(ctx context.Context, conn net.Conn, dest net.Conn) error {
 	group.Cleanup(func() {
 		common.Close(conn, dest)
 	})
-	return group.Run(ctx)
+	return group.RunContextList(contextList)
 }
 
 func CopyPacket(dst N.PacketWriter, src N.PacketReader) (n int64, err error) {
@@ -335,6 +339,10 @@ func CopyPacketWithPool(dst N.PacketWriter, src N.PacketReader) (n int64, err er
 }
 
 func CopyPacketConn(ctx context.Context, conn N.PacketConn, dest N.PacketConn) error {
+	return CopyPacketConnContextList([]context.Context{ctx}, conn, dest)
+}
+
+func CopyPacketConnContextList(contextList []context.Context, conn N.PacketConn, dest N.PacketConn) error {
 	var group task.Group
 	group.Append("upload", func(ctx context.Context) error {
 		return common.Error(CopyPacket(dest, conn))
@@ -346,5 +354,5 @@ func CopyPacketConn(ctx context.Context, conn N.PacketConn, dest N.PacketConn) e
 		common.Close(conn, dest)
 	})
 	group.FastFail()
-	return group.Run(ctx)
+	return group.RunContextList(contextList)
 }

@@ -117,6 +117,7 @@ func (c *GunConn) WriteBuffer(buffer *buf.Buffer) error {
 	dataLen := buffer.Len()
 	varLen := rw.UVariantLen(uint64(dataLen))
 	header := buffer.ExtendHeader(6 + varLen)
+	_ = header[6]
 	header[0] = 0x00
 	binary.BigEndian.PutUint32(header[1:5], uint32(1+varLen+dataLen))
 	header[5] = 0x0A
@@ -145,28 +146,13 @@ func (c *GunConn) RemoteAddr() net.Addr {
 }
 
 func (c *GunConn) SetDeadline(t time.Time) error {
-	if responseWriter, loaded := c.writer.(interface {
-		SetWriteDeadline(time.Time) error
-	}); loaded {
-		return responseWriter.SetWriteDeadline(t)
-	}
 	return os.ErrInvalid
 }
 
 func (c *GunConn) SetReadDeadline(t time.Time) error {
-	if responseWriter, loaded := c.writer.(interface {
-		SetReadDeadline(time.Time) error
-	}); loaded {
-		return responseWriter.SetReadDeadline(t)
-	}
 	return os.ErrInvalid
 }
 
 func (c *GunConn) SetWriteDeadline(t time.Time) error {
-	if responseWriter, loaded := c.writer.(interface {
-		SetWriteDeadline(time.Time) error
-	}); loaded {
-		return responseWriter.SetWriteDeadline(t)
-	}
 	return os.ErrInvalid
 }

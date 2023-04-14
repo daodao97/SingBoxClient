@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
@@ -13,12 +14,12 @@ import (
 type TimeoutPacketConn struct {
 	N.PacketConn
 	timeout time.Duration
-	cancel  context.CancelFunc
+	cancel  common.ContextCancelCauseFunc
 	active  time.Time
 }
 
 func NewTimeoutPacketConn(ctx context.Context, conn N.PacketConn, timeout time.Duration) (context.Context, PacketConn) {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := common.ContextWithCancelCause(ctx)
 	return ctx, &TimeoutPacketConn{
 		PacketConn: conn,
 		timeout:    timeout,
@@ -38,7 +39,7 @@ func (c *TimeoutPacketConn) ReadPacket(buffer *buf.Buffer) (destination M.Socksa
 			return
 		} else if E.IsTimeout(err) {
 			if time.Since(c.active) > c.timeout {
-				c.cancel()
+				c.cancel(err)
 				return
 			}
 		} else {

@@ -47,6 +47,10 @@ type Server struct {
 	storeFakeIP    bool
 	cacheFilePath  string
 	cacheFile      adapter.ClashCacheFile
+
+	externalUI               string
+	externalUIDownloadURL    string
+	externalUIDownloadDetour string
 }
 
 func NewServer(router adapter.Router, logFactory log.ObservableFactory, options option.ClashAPIOptions) (adapter.ClashServer, error) {
@@ -59,11 +63,13 @@ func NewServer(router adapter.Router, logFactory log.ObservableFactory, options 
 			Addr:    options.ExternalController,
 			Handler: chiRouter,
 		},
-		trafficManager: trafficManager,
-		urlTestHistory: urltest.NewHistoryStorage(),
-		mode:           strings.ToLower(options.DefaultMode),
-		storeSelected:  options.StoreSelected,
-		storeFakeIP:    options.StoreFakeIP,
+		trafficManager:           trafficManager,
+		urlTestHistory:           urltest.NewHistoryStorage(),
+		mode:                     strings.ToLower(options.DefaultMode),
+		storeSelected:            options.StoreSelected,
+		storeFakeIP:              options.StoreFakeIP,
+		externalUIDownloadURL:    options.ExternalUIDownloadURL,
+		externalUIDownloadDetour: options.ExternalUIDownloadDetour,
 	}
 	if server.mode == "" {
 		server.mode = "rule"
@@ -103,10 +109,13 @@ func NewServer(router adapter.Router, logFactory log.ObservableFactory, options 
 		r.Mount("/profile", profileRouter())
 		r.Mount("/cache", cacheRouter(router))
 		r.Mount("/dns", dnsRouter(router))
+
+		server.setupMetaAPI(r)
 	})
 	if options.ExternalUI != "" {
+		server.externalUI = C.BasePath(os.ExpandEnv(options.ExternalUI))
 		chiRouter.Group(func(r chi.Router) {
-			fs := http.StripPrefix("/ui", http.FileServer(http.Dir(C.BasePath(os.ExpandEnv(options.ExternalUI)))))
+			fs := http.StripPrefix("/ui", http.FileServer(http.Dir(server.externalUI)))
 			r.Get("/ui", http.RedirectHandler("/ui/", http.StatusTemporaryRedirect).ServeHTTP)
 			r.Get("/ui/*", func(w http.ResponseWriter, r *http.Request) {
 				fs.ServeHTTP(w, r)
@@ -128,6 +137,7 @@ func (s *Server) PreStart() error {
 }
 
 func (s *Server) Start() error {
+	s.checkAndDownloadExternalUI()
 	listener, err := net.Listen("tcp", s.httpServer.Addr)
 	if err != nil {
 		return E.Cause(err, "external controller listen error")
@@ -398,5 +408,5 @@ func getLogs(logFactory log.ObservableFactory) func(w http.ResponseWriter, r *ht
 }
 
 func version(w http.ResponseWriter, r *http.Request) {
-	render.JSON(w, r, render.M{"version": "sing-box " + C.Version, "premium": true})
+	render.JSON(w, r, render.M{"version": "sing-box " + C.Version, "premium": true, "meta": true})
 }

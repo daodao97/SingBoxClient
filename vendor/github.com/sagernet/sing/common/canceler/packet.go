@@ -33,7 +33,7 @@ func NewPacketConn(ctx context.Context, conn N.PacketConn, timeout time.Duration
 	if err == nil {
 		return NewTimeoutPacketConn(ctx, conn, timeout)
 	}
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := common.ContextWithCancelCause(ctx)
 	instance := New(ctx, cancel, timeout)
 	return ctx, &TimerPacketConn{conn, instance}
 }

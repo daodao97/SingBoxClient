@@ -14,6 +14,7 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
+	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -138,20 +139,20 @@ func (c *serverSession) recv() error {
 		go func() {
 			var hErr error
 			if network == NetworkTCP {
-				hErr = c.handler.NewConnection(c.ctx, &serverMuxConn{
+				hErr = c.handler.NewConnection(c.ctx, deadline.NewConn(&serverMuxConn{
 					sessionID,
 					pipeIn,
 					c,
-				}, M.Metadata{
+				}), M.Metadata{
 					Destination: destination,
 				})
 			} else {
-				hErr = c.handler.NewPacketConnection(c.ctx, &serverMuxPacketConn{
+				hErr = c.handler.NewPacketConnection(c.ctx, deadline.NewPacketConn(&serverMuxPacketConn{
 					sessionID,
 					pipeIn,
 					c,
 					destination,
-				}, M.Metadata{
+				}), M.Metadata{
 					Destination: destination,
 				})
 			}

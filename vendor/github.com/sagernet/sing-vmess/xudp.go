@@ -44,7 +44,11 @@ func (c *XUDPConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	if err != nil {
 		return
 	}
-	addr = destination.UDPAddr()
+	if destination.IsFqdn() {
+		addr = destination
+	} else {
+		addr = destination.UDPAddr()
+	}
 	n = buffer.Len()
 	return
 }

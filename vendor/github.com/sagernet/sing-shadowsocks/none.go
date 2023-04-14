@@ -155,7 +155,11 @@ func (c *nonePacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	if err != nil {
 		return
 	}
-	addr = destination.UDPAddr()
+	if destination.IsFqdn() {
+		addr = destination
+	} else {
+		addr = destination.UDPAddr()
+	}
 	n = copy(p, buffer.Bytes())
 	return
 }

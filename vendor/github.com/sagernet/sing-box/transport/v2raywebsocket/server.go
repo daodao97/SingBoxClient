@@ -16,6 +16,7 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
+	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -52,6 +53,9 @@ func NewServer(ctx context.Context, options option.V2RayWebsocketOptions, tlsCon
 		Handler:           server,
 		ReadHeaderTimeout: C.TCPTimeout,
 		MaxHeaderBytes:    http.DefaultMaxHeaderBytes,
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
 	}
 	return server, nil
 }
@@ -95,7 +99,7 @@ func (s *Server) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	}
 	wsConn, err := upgrader.Upgrade(writer, request, nil)
 	if err != nil {
-		s.fallbackRequest(request.Context(), writer, request, http.StatusBadRequest, E.Cause(err, "upgrade websocket connection"))
+		s.fallbackRequest(request.Context(), writer, request, 0, E.Cause(err, "upgrade websocket connection"))
 		return
 	}
 	var metadata M.Metadata
@@ -104,7 +108,7 @@ func (s *Server) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if len(earlyData) > 0 {
 		conn = bufio.NewCachedConn(conn, buf.As(earlyData))
 	}
-	s.handler.NewConnection(request.Context(), conn, metadata)
+	s.handler.NewConnection(request.Context(), deadline.NewConn(conn), metadata)
 }
 
 func (s *Server) fallbackRequest(ctx context.Context, writer http.ResponseWriter, request *http.Request, statusCode int, err error) {
@@ -115,7 +119,9 @@ func (s *Server) fallbackRequest(ctx context.Context, writer http.ResponseWriter
 	} else if fErr == os.ErrInvalid {
 		fErr = nil
 	}
-	writer.WriteHeader(statusCode)
+	if statusCode > 0 {
+		writer.WriteHeader(statusCode)
+	}
 	s.handler.NewError(request.Context(), E.Cause(E.Errors(err, E.Cause(fErr, "fallback connection")), "process connection from ", request.RemoteAddr))
 }
 

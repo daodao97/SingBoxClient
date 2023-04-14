@@ -23,17 +23,32 @@ type Client struct {
 	serverAddr M.Socksaddr
 	username   string
 	password   string
-	headers    map[string]string
+	path       string
+	headers    http.Header
 }
 
-func NewClient(dialer N.Dialer, serverAddr M.Socksaddr, username string, password string, headers map[string]string) *Client {
-	return &Client{
-		dialer,
-		serverAddr,
-		username,
-		password,
-		headers,
+type Options struct {
+	Dialer   N.Dialer
+	Server   M.Socksaddr
+	Username string
+	Password string
+	Path     string
+	Headers  http.Header
+}
+
+func NewClient(options Options) *Client {
+	client := &Client{
+		dialer:     options.Dialer,
+		serverAddr: options.Server,
+		username:   options.Username,
+		password:   options.Password,
+		path:       options.Path,
+		headers:    options.Headers,
 	}
+	if options.Dialer == nil {
+		client.dialer = N.SystemDialer
+	}
+	return client
 }
 
 func (c *Client) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
@@ -50,19 +65,26 @@ func (c *Client) DialContext(ctx context.Context, network string, destination M.
 	if err != nil {
 		return nil, err
 	}
-	destinationAddress := destination.String()
 	request := &http.Request{
 		Method: http.MethodConnect,
 		URL: &url.URL{
-			Host: destinationAddress,
+			Host: destination.String(),
 		},
-		Host: destinationAddress,
 		Header: http.Header{
 			"Proxy-Connection": []string{"Keep-Alive"},
 		},
 	}
-	for key, value := range c.headers {
-		request.Header.Set(key, value)
+	if c.path != "" {
+		err = URLSetPath(request.URL, c.path)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for key, valueList := range c.headers {
+		request.Header.Set(key, valueList[0])
+		for _, value := range valueList[1:] {
+			request.Header.Add(key, value)
+		}
 	}
 	if c.username != "" {
 		auth := c.username + ":" + c.password

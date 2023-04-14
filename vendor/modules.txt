@@ -121,6 +121,9 @@ github.com/go-task/slim-sprig
 # github.com/gofrs/uuid v4.4.0+incompatible
 ## explicit
 github.com/gofrs/uuid
+# github.com/gofrs/uuid/v5 v5.0.0
+## explicit; go 1.19
+github.com/gofrs/uuid/v5
 # github.com/golang/mock v1.6.0
 ## explicit; go 1.11
 github.com/golang/mock/mockgen
@@ -142,7 +145,7 @@ github.com/google/pprof/profile
 # github.com/hashicorp/yamux v0.1.1
 ## explicit; go 1.15
 github.com/hashicorp/yamux
-# github.com/insomniacslk/dhcp v0.0.0-20230327135226-74ae03f2425e
+# github.com/insomniacslk/dhcp v0.0.0-20230407062729-974c6f05fe16
 ## explicit; go 1.18
 github.com/insomniacslk/dhcp/dhcpv4
 github.com/insomniacslk/dhcp/iana
@@ -260,15 +263,17 @@ github.com/sagernet/quic-go/quicvarint
 # github.com/sagernet/reality v0.0.0-20230406110435-ee17307e7691
 ## explicit; go 1.18
 github.com/sagernet/reality
-# github.com/sagernet/sing v0.2.2-0.20230407053809-308e421e33c2
+# github.com/sagernet/sing v0.2.3-0.20230413023204-48b019b13e78
 ## explicit; go 1.18
 github.com/sagernet/sing/common
 github.com/sagernet/sing/common/abx
 github.com/sagernet/sing/common/abx/internal
+github.com/sagernet/sing/common/atomic
 github.com/sagernet/sing/common/auth
 github.com/sagernet/sing/common/batch
 github.com/sagernet/sing/common/buf
 github.com/sagernet/sing/common/bufio
+github.com/sagernet/sing/common/bufio/deadline
 github.com/sagernet/sing/common/cache
 github.com/sagernet/sing/common/canceler
 github.com/sagernet/sing/common/control
@@ -285,6 +290,7 @@ github.com/sagernet/sing/common/random
 github.com/sagernet/sing/common/ranges
 github.com/sagernet/sing/common/replay
 github.com/sagernet/sing/common/rw
+github.com/sagernet/sing/common/service
 github.com/sagernet/sing/common/shell
 github.com/sagernet/sing/common/task
 github.com/sagernet/sing/common/tls
@@ -362,14 +368,14 @@ github.com/sagernet/sing-box/transport/wireguard
 ## explicit; go 1.18
 github.com/sagernet/sing-dns
 github.com/sagernet/sing-dns/quic
-# github.com/sagernet/sing-shadowsocks v0.2.0
+# github.com/sagernet/sing-shadowsocks v0.2.1-0.20230412123110-1a7c32b4e2e7
 ## explicit; go 1.18
 github.com/sagernet/sing-shadowsocks
 github.com/sagernet/sing-shadowsocks/shadowaead
 github.com/sagernet/sing-shadowsocks/shadowaead_2022
 github.com/sagernet/sing-shadowsocks/shadowimpl
 github.com/sagernet/sing-shadowsocks/shadowstream
-# github.com/sagernet/sing-shadowtls v0.1.0
+# github.com/sagernet/sing-shadowtls v0.1.1-0.20230409094821-9abef019436f
 ## explicit; go 1.18
 github.com/sagernet/sing-shadowtls
 github.com/sagernet/sing-shadowtls/tls
@@ -382,7 +388,7 @@ github.com/sagernet/sing-tun/internal/winipcfg
 github.com/sagernet/sing-tun/internal/winsys
 github.com/sagernet/sing-tun/internal/wintun
 github.com/sagernet/sing-tun/internal/wintun/memmod
-# github.com/sagernet/sing-vmess v0.1.3
+# github.com/sagernet/sing-vmess v0.1.4-0.20230412122845-9470e68f5e45
 ## explicit; go 1.18
 github.com/sagernet/sing-vmess
 github.com/sagernet/sing-vmess/packetaddr
@@ -452,7 +458,7 @@ go.uber.org/zap/zapcore
 # go4.org/netipx v0.0.0-20230303233057-f1b76eb4bb35
 ## explicit; go 1.18
 go4.org/netipx
-# golang.org/x/crypto v0.7.0
+# golang.org/x/crypto v0.8.0
 ## explicit; go 1.17
 golang.org/x/crypto/blake2s
 golang.org/x/crypto/blowfish

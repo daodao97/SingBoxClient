@@ -1,35 +1,33 @@
 package trafficontrol
 
 import (
+	"runtime"
 	"time"
 
 	"github.com/sagernet/sing-box/experimental/clashapi/compatible"
-
-	"go.uber.org/atomic"
+	"github.com/sagernet/sing/common/atomic"
 )
 
 type Manager struct {
-	connections   compatible.Map[string, tracker]
-	uploadTemp    *atomic.Int64
-	downloadTemp  *atomic.Int64
-	uploadBlip    *atomic.Int64
-	downloadBlip  *atomic.Int64
-	uploadTotal   *atomic.Int64
-	downloadTotal *atomic.Int64
-	ticker        *time.Ticker
-	done          chan struct{}
+	uploadTemp    atomic.Int64
+	downloadTemp  atomic.Int64
+	uploadBlip    atomic.Int64
+	downloadBlip  atomic.Int64
+	uploadTotal   atomic.Int64
+	downloadTotal atomic.Int64
+
+	connections compatible.Map[string, tracker]
+	ticker      *time.Ticker
+	done        chan struct{}
+	// process     *process.Process
+	memory uint64
 }
 
 func NewManager() *Manager {
 	manager := &Manager{
-		uploadTemp:    atomic.NewInt64(0),
-		downloadTemp:  atomic.NewInt64(0),
-		uploadBlip:    atomic.NewInt64(0),
-		downloadBlip:  atomic.NewInt64(0),
-		uploadTotal:   atomic.NewInt64(0),
-		downloadTotal: atomic.NewInt64(0),
-		ticker:        time.NewTicker(time.Second),
-		done:          make(chan struct{}),
+		ticker: time.NewTicker(time.Second),
+		done:   make(chan struct{}),
+		// process: &process.Process{Pid: int32(os.Getpid())},
 	}
 	go manager.handle()
 	return manager
@@ -64,10 +62,18 @@ func (m *Manager) Snapshot() *Snapshot {
 		return true
 	})
 
+	//if memoryInfo, err := m.process.MemoryInfo(); err == nil {
+	//	m.memory = memoryInfo.RSS
+	//} else {
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	m.memory = memStats.StackInuse + memStats.HeapInuse + memStats.HeapIdle - memStats.HeapReleased
+
 	return &Snapshot{
 		UploadTotal:   m.uploadTotal.Load(),
 		DownloadTotal: m.downloadTotal.Load(),
 		Connections:   connections,
+		Memory:        m.memory,
 	}
 }
 
@@ -106,4 +112,5 @@ type Snapshot struct {
 	DownloadTotal int64     `json:"downloadTotal"`
 	UploadTotal   int64     `json:"uploadTotal"`
 	Connections   []tracker `json:"connections"`
+	Memory        uint64    `json:"memory"`
 }

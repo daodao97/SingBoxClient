@@ -164,13 +164,13 @@ func (b *Buffer) WriteByte(d byte) error {
 	return nil
 }
 
-func (b *Buffer) ReadOnceFrom(r io.Reader) (int64, error) {
+func (b *Buffer) ReadOnceFrom(r io.Reader) (int, error) {
 	if b.IsFull() {
 		return 0, io.ErrShortBuffer
 	}
 	n, err := r.Read(b.FreeBytes())
 	b.end += n
-	return int64(n), err
+	return n, err
 }
 
 func (b *Buffer) ReadPacketFrom(r net.PacketConn) (int64, net.Addr, error) {
@@ -184,7 +184,8 @@ func (b *Buffer) ReadPacketFrom(r net.PacketConn) (int64, net.Addr, error) {
 
 func (b *Buffer) ReadAtLeastFrom(r io.Reader, min int) (int64, error) {
 	if min <= 0 {
-		return b.ReadOnceFrom(r)
+		n, err := b.ReadOnceFrom(r)
+		return int64(n), err
 	}
 	if b.IsFull() {
 		return 0, io.ErrShortBuffer

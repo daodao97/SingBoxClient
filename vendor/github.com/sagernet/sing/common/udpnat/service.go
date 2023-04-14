@@ -74,7 +74,7 @@ func (s *Service[T]) NewContextPacket(ctx context.Context, key T, buffer *buf.Bu
 			localAddr:  metadata.Source,
 			remoteAddr: metadata.Destination,
 		}
-		c.ctx, c.cancel = context.WithCancel(ctx)
+		c.ctx, c.cancel = common.ContextWithCancelCause(ctx)
 		return c
 	})
 	if !loaded {
@@ -110,7 +110,7 @@ type packet struct {
 
 type conn struct {
 	ctx          context.Context
-	cancel       context.CancelFunc
+	cancel       common.ContextCancelCauseFunc
 	data         chan packet
 	localAddr    M.Socksaddr
 	remoteAddr   M.Socksaddr
@@ -180,7 +180,7 @@ func (c *conn) Close() error {
 		return os.ErrClosed
 	default:
 	}
-	c.cancel()
+	c.cancel(net.ErrClosed)
 	if sourceCloser, sourceIsCloser := c.source.(io.Closer); sourceIsCloser {
 		return sourceCloser.Close()
 	}

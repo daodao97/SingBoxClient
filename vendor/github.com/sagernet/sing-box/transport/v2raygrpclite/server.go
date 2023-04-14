@@ -2,10 +2,8 @@ package v2raygrpclite
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -15,6 +13,7 @@ import (
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-box/transport/v2rayhttp"
 	"github.com/sagernet/sing/common"
+	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -45,13 +44,16 @@ func NewServer(ctx context.Context, options option.V2RayGRPCOptions, tlsConfig t
 	server := &Server{
 		tlsConfig: tlsConfig,
 		handler:   handler,
-		path:      fmt.Sprintf("/%s/Tun", url.QueryEscape(options.ServiceName)),
+		path:      "/" + options.ServiceName + "/Tun",
 		h2Server: &http2.Server{
 			IdleTimeout: time.Duration(options.IdleTimeout),
 		},
 	}
 	server.httpServer = &http.Server{
 		Handler: server,
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
 	}
 	server.h2cHandler = h2c.NewHandler(server, server.h2Server)
 	return server, nil
@@ -80,7 +82,7 @@ func (s *Server) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	var metadata M.Metadata
 	metadata.Source = sHttp.SourceAddress(request)
 	conn := v2rayhttp.NewHTTP2Wrapper(newGunConn(request.Body, writer, writer.(http.Flusher)))
-	s.handler.NewConnection(request.Context(), conn, metadata)
+	s.handler.NewConnection(request.Context(), deadline.NewConn(conn), metadata)
 	conn.CloseWrapper()
 }
 
@@ -92,14 +94,16 @@ func (s *Server) fallbackRequest(ctx context.Context, writer http.ResponseWriter
 	} else if fErr == os.ErrInvalid {
 		fErr = nil
 	}
-	writer.WriteHeader(statusCode)
+	if statusCode > 0 {
+		writer.WriteHeader(statusCode)
+	}
 	s.handler.NewError(request.Context(), E.Cause(E.Errors(err, E.Cause(fErr, "fallback connection")), "process connection from ", request.RemoteAddr))
 }
 
 func (s *Server) Serve(listener net.Listener) error {
 	if s.tlsConfig != nil {
-		if len(s.tlsConfig.NextProtos()) == 0 {
-			s.tlsConfig.SetNextProtos([]string{http2.NextProtoTLS})
+		if !common.Contains(s.tlsConfig.NextProtos(), http2.NextProtoTLS) {
+			s.tlsConfig.SetNextProtos(append([]string{"h2"}, s.tlsConfig.NextProtos()...))
 		}
 		listener = aTLS.NewListener(listener, s.tlsConfig)
 	}

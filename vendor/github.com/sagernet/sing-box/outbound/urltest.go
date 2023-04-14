@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
@@ -25,6 +26,7 @@ var (
 
 type URLTest struct {
 	myOutboundAdapter
+	ctx       context.Context
 	tags      []string
 	link      string
 	interval  time.Duration
@@ -32,7 +34,7 @@ type URLTest struct {
 	group     *URLTestGroup
 }
 
-func NewURLTest(router adapter.Router, logger log.ContextLogger, tag string, options option.URLTestOutboundOptions) (*URLTest, error) {
+func NewURLTest(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.URLTestOutboundOptions) (*URLTest, error) {
 	outbound := &URLTest{
 		myOutboundAdapter: myOutboundAdapter{
 			protocol: C.TypeURLTest,
@@ -40,6 +42,7 @@ func NewURLTest(router adapter.Router, logger log.ContextLogger, tag string, opt
 			logger:   logger,
 			tag:      tag,
 		},
+		ctx:       ctx,
 		tags:      options.Outbounds,
 		link:      options.URL,
 		interval:  time.Duration(options.Interval),
@@ -67,11 +70,11 @@ func (s *URLTest) Start() error {
 		}
 		outbounds = append(outbounds, detour)
 	}
-	s.group = NewURLTestGroup(s.router, s.logger, outbounds, s.link, s.interval, s.tolerance)
+	s.group = NewURLTestGroup(s.ctx, s.router, s.logger, outbounds, s.link, s.interval, s.tolerance)
 	return s.group.Start()
 }
 
-func (s URLTest) Close() error {
+func (s *URLTest) Close() error {
 	return common.Close(
 		common.PtrOrNil(s.group),
 	)
@@ -85,6 +88,10 @@ func (s *URLTest) All() []string {
 	return s.tags
 }
 
+func (s *URLTest) URLTest(ctx context.Context, link string) (map[string]uint16, error) {
+	return s.group.URLTest(ctx, link)
+}
+
 func (s *URLTest) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
 	outbound := s.group.Select(network)
 	conn, err := outbound.DialContext(ctx, network, destination)
@@ -92,14 +99,7 @@ func (s *URLTest) DialContext(ctx context.Context, network string, destination M
 		return conn, nil
 	}
 	s.logger.ErrorContext(ctx, err)
-	go s.group.checkOutbounds()
-	outbounds := s.group.Fallback(outbound)
-	for _, fallback := range outbounds {
-		conn, err = fallback.DialContext(ctx, network, destination)
-		if err == nil {
-			return conn, nil
-		}
-	}
+	s.group.history.DeleteURLTestHistory(outbound.Tag())
 	return nil, err
 }
 
@@ -110,14 +110,7 @@ func (s *URLTest) ListenPacket(ctx context.Context, destination M.Socksaddr) (ne
 		return conn, nil
 	}
 	s.logger.ErrorContext(ctx, err)
-	go s.group.checkOutbounds()
-	outbounds := s.group.Fallback(outbound)
-	for _, fallback := range outbounds {
-		conn, err = fallback.ListenPacket(ctx, destination)
-		if err == nil {
-			return conn, nil
-		}
-	}
+	s.group.history.DeleteURLTestHistory(outbound.Tag())
 	return nil, err
 }
 
@@ -130,6 +123,7 @@ func (s *URLTest) NewPacketConnection(ctx context.Context, conn N.PacketConn, me
 }
 
 type URLTestGroup struct {
+	ctx       context.Context
 	router    adapter.Router
 	logger    log.Logger
 	outbounds []adapter.Outbound
@@ -142,11 +136,7 @@ type URLTestGroup struct {
 	close  chan struct{}
 }
 
-func NewURLTestGroup(router adapter.Router, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, tolerance uint16) *URLTestGroup {
-	if link == "" {
-		//goland:noinspection HttpUrlsUsage
-		link = "http://www.gstatic.com/generate_204"
-	}
+func NewURLTestGroup(ctx context.Context, router adapter.Router, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, tolerance uint16) *URLTestGroup {
 	if interval == 0 {
 		interval = C.DefaultURLTestInterval
 	}
@@ -160,6 +150,7 @@ func NewURLTestGroup(router adapter.Router, logger log.Logger, outbounds []adapt
 		history = urltest.NewHistoryStorage()
 	}
 	return &URLTestGroup{
+		ctx:       ctx,
 		router:    router,
 		logger:    logger,
 		outbounds: outbounds,
@@ -249,8 +240,14 @@ func (g *URLTestGroup) loopCheck() {
 }
 
 func (g *URLTestGroup) checkOutbounds() {
-	b, _ := batch.New(context.Background(), batch.WithConcurrencyNum[any](10))
+	_, _ = g.URLTest(g.ctx, g.link)
+}
+
+func (g *URLTestGroup) URLTest(ctx context.Context, link string) (map[string]uint16, error) {
+	b, _ := batch.New(ctx, batch.WithConcurrencyNum[any](10))
 	checked := make(map[string]bool)
+	result := make(map[string]uint16)
+	var resultAccess sync.Mutex
 	for _, detour := range g.outbounds {
 		tag := detour.Tag()
 		realTag := RealTag(detour)
@@ -269,7 +266,7 @@ func (g *URLTestGroup) checkOutbounds() {
 		b.Go(realTag, func() (any, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), C.TCPTimeout)
 			defer cancel()
-			t, err := urltest.URLTest(ctx, g.link, p)
+			t, err := urltest.URLTest(ctx, link, p)
 			if err != nil {
 				g.logger.Debug("outbound ", tag, " unavailable: ", err)
 				g.history.DeleteURLTestHistory(realTag)
@@ -279,9 +276,13 @@ func (g *URLTestGroup) checkOutbounds() {
 					Time:  time.Now(),
 					Delay: t,
 				})
+				resultAccess.Lock()
+				result[tag] = t
+				resultAccess.Unlock()
 			}
 			return nil, nil
 		})
 	}
 	b.Wait()
+	return result, nil
 }

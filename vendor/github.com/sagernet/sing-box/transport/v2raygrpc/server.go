@@ -10,9 +10,12 @@ import (
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/tls"
 	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing/common"
+	"github.com/sagernet/sing/common/bufio/deadline"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 
+	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	gM "google.golang.org/grpc/metadata"
@@ -30,7 +33,9 @@ type Server struct {
 func NewServer(ctx context.Context, options option.V2RayGRPCOptions, tlsConfig tls.ServerConfig, handler N.TCPConnectionHandler) (*Server, error) {
 	var serverOptions []grpc.ServerOption
 	if tlsConfig != nil {
-		tlsConfig.SetNextProtos([]string{"h2"})
+		if !common.Contains(tlsConfig.NextProtos(), http2.NextProtoTLS) {
+			tlsConfig.SetNextProtos(append([]string{"h2"}, tlsConfig.NextProtos()...))
+		}
 		serverOptions = append(serverOptions, grpc.Creds(NewTLSTransportCredentials(tlsConfig)))
 	}
 	if options.IdleTimeout > 0 {
@@ -45,7 +50,7 @@ func NewServer(ctx context.Context, options option.V2RayGRPCOptions, tlsConfig t
 }
 
 func (s *Server) Tun(server GunService_TunServer) error {
-	ctx, cancel := context.WithCancel(s.ctx)
+	ctx, cancel := common.ContextWithCancelCause(s.ctx)
 	conn := NewGRPCConn(server, cancel)
 	var metadata M.Metadata
 	if remotePeer, loaded := peer.FromContext(server.Context()); loaded {
@@ -62,7 +67,7 @@ func (s *Server) Tun(server GunService_TunServer) error {
 			}
 		}
 	}
-	go s.handler.NewConnection(ctx, conn, metadata)
+	go s.handler.NewConnection(ctx, deadline.NewConn(conn), metadata)
 	<-ctx.Done()
 	return nil
 }

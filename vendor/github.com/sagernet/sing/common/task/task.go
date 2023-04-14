@@ -4,12 +4,19 @@ import (
 	"context"
 	"sync"
 
+	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
 )
 
 type taskItem struct {
 	Name string
 	Run  func(ctx context.Context) error
+}
+
+type errTaskSucceed struct{}
+
+func (e errTaskSucceed) Error() string {
+	return "task succeed"
 }
 
 type Group struct {
@@ -39,67 +46,57 @@ func (g *Group) FastFail() {
 	g.fastFail = true
 }
 
-func (g *Group) Run(ctx context.Context) error {
-	var retAccess sync.Mutex
-	var retErr error
+func (g *Group) Run(contextList ...context.Context) error {
+	return g.RunContextList(contextList)
+}
 
-	taskCount := int8(len(g.tasks))
-	taskCtx, taskFinish := context.WithCancel(context.Background())
-	var mixedCtx context.Context
-	var mixedFinish context.CancelFunc
-	if ctx.Done() != nil || g.fastFail {
-		mixedCtx, mixedFinish = context.WithCancel(ctx)
-	} else {
-		mixedCtx, mixedFinish = taskCtx, taskFinish
+func (g *Group) RunContextList(contextList []context.Context) error {
+	if len(contextList) == 0 {
+		contextList = append(contextList, context.Background())
 	}
+
+	taskContext, taskFinish := common.ContextWithCancelCause(context.Background())
+	taskCancelContext, taskCancel := common.ContextWithCancelCause(context.Background())
+
+	var errorAccess sync.Mutex
+	var returnError error
+	taskCount := int8(len(g.tasks))
 
 	for _, task := range g.tasks {
 		currentTask := task
 		go func() {
-			err := currentTask.Run(mixedCtx)
-			retAccess.Lock()
+			err := currentTask.Run(taskCancelContext)
+			errorAccess.Lock()
 			if err != nil {
-				retErr = E.Append(retErr, err, func(err error) error {
-					if currentTask.Name == "" {
-						return err
-					}
-					return E.Cause(err, currentTask.Name)
-				})
+				if currentTask.Name != "" {
+					err = E.Cause(err, currentTask.Name)
+				}
+				returnError = E.Errors(returnError, err)
 				if g.fastFail {
-					mixedFinish()
+					taskCancel(err)
 				}
 			}
 			taskCount--
 			currentCount := taskCount
-			retAccess.Unlock()
+			errorAccess.Unlock()
 			if currentCount == 0 {
-				taskFinish()
+				taskCancel(errTaskSucceed{})
+				taskFinish(errTaskSucceed{})
 			}
 		}()
 	}
 
-	var upstreamErr error
-
-	select {
-	case <-ctx.Done():
-		upstreamErr = ctx.Err()
-	case <-taskCtx.Done():
-		mixedFinish()
-	case <-mixedCtx.Done():
+	selectedContext, upstreamErr := common.SelectContext(append([]context.Context{taskContext}, contextList...))
+	if selectedContext != 0 {
+		returnError = E.Append(returnError, upstreamErr, func(err error) error {
+			return E.Cause(err, "upstream")
+		})
 	}
 
 	if g.cleanup != nil {
 		g.cleanup()
 	}
 
-	<-taskCtx.Done()
-
-	taskFinish()
-	mixedFinish()
-
-	retErr = E.Append(retErr, upstreamErr, func(err error) error {
-		return E.Cause(err, "upstream")
-	})
-
-	return retErr
+	<-taskContext.Done()
+	return returnError
 }

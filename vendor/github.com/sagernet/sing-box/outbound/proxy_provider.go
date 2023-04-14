@@ -221,7 +221,7 @@ func (s *Provider) updateSelected(outboundMap map[string]adapter.Outbound) error
 
 		s.logger.Debug("NewURLTestGroup ", len(outbounds))
 
-		s.group = NewURLTestGroup(s.router, s.logger, outbounds, s.urlTest.Url, interval, 100)
+		s.group = NewURLTestGroup(context.Background(), s.router, s.logger, outbounds, s.urlTest.Url, interval, 100)
 		err = s.group.Start()
 		if err != nil {
 			s.logger.Error("start NewURLTestGroup err ", s.policy)
