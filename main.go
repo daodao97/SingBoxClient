@@ -72,6 +72,9 @@ func main() {
 
 	loadAppConf()
 	ConfDir = filepath.Join(home, ".singbox")
+
+	os.Chdir(ConfDir)
+
 	Conf = filepath.Join(home, ".singbox", "config.json")
 
 	systray.Run(onReady, onExit)

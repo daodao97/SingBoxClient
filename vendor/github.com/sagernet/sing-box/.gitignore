@@ -13,3 +13,4 @@
 /*.xcframework/
 .DS_Store
 /config.d/
+.conf
