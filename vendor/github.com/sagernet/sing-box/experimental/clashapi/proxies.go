@@ -93,8 +93,6 @@ func proxyInfo(server *Server, detour adapter.Outbound) *badjson.JSONObject {
 		clashType = "Selector"
 	case C.TypeURLTest:
 		clashType = "URLTest"
-	case C.TypeProvider:
-		clashType = "Provider"
 	default:
 		clashType = "Direct"
 	}
@@ -105,12 +103,7 @@ func proxyInfo(server *Server, detour adapter.Outbound) *badjson.JSONObject {
 	if delayHistory != nil {
 		info.Put("history", []*urltest.History{delayHistory})
 	} else {
-		info.Put("history", []*urltest.History{
-			{
-				Time:  time.Now(),
-				Delay: DELAY.get(detour),
-			},
-		})
+		info.Put("history", []*urltest.History{})
 	}
 	if group, isGroup := detour.(adapter.OutboundGroup); isGroup {
 		info.Put("now", group.Now())

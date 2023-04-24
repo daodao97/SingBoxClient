@@ -90,6 +90,10 @@ func (c *shadowConn) WriteVectorised(buffers []*buf.Buffer) error {
 	return c.writer.WriteVectorised(append([]*buf.Buffer{buf.As(header[:])}, buffers...))
 }
 
+func (c *shadowConn) NeedAdditionalReadDeadline() bool {
+	return true
+}
+
 func (c *shadowConn) Upstream() any {
 	return c.Conn
 }

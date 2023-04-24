@@ -142,6 +142,14 @@ func (c *verifiedConn) WriteVectorised(buffers []*buf.Buffer) error {
 	return c.writer.WriteVectorised(append([]*buf.Buffer{buf.As(header[:])}, buffers...))
 }
 
+func (c *verifiedConn) NeedAdditionalReadDeadline() bool {
+	return true
+}
+
+func (c *verifiedConn) Upstream() any {
+	return c.Conn
+}
+
 func verifyApplicationData(frame []byte, hmac hash.Hash, update bool) bool {
 	if frame[1] != 3 || frame[2] != 3 || len(frame) < tlsHmacHeaderSize {
 		return false

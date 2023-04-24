@@ -107,3 +107,6 @@ update:
 
 linux:
 	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ go build --tags with_quic,with_grpc,with_wireguard,with_shadowsocksr,with_ech,with_utls,with_acme,with_clash_api,with_gvisor ./cmd/sing-box
+
+mac:
+	CGO_ENABLED=1 go build --tags with_quic,with_grpc,with_wireguard,with_shadowsocksr,with_ech,with_utls,with_acme,with_clash_api,with_gvisor ./cmd/sing-box

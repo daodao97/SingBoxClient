@@ -1,3 +1,12 @@
+build:
+	GOOS=darwin GOARCH=arm64 go build -v -tags with_gvisor .
+	GOOS=ios GOARCH=arm64 go build -v -tags with_gvisor .
+	GOOS=linux GOARCH=amd64 go build -v -tags with_gvisor .
+	GOOS=linux GOARCH=arm64 go build -v -tags with_gvisor .
+	GOOS=linux GOARCH=386 go build -v -tags with_gvisor .
+	GOOS=linux GOARCH=arm go build -v -tags with_gvisor .
+	GOOS=windows GOARCH=amd64 go build -v -tags with_gvisor .
+
 fmt:
 	@gofumpt -l -w .
 	@gofmt -s -w .

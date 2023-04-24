@@ -15,6 +15,7 @@ import (
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
+	"github.com/sagernet/sing/service/filemanager"
 	"io"
 	"math/rand"
 	"net"
@@ -97,7 +98,7 @@ func NewProvider(router adapter.Router, logger log.ContextLogger, tag string, op
 
 	if outbound.providerType == "url" && len(outbound.path) == 0 {
 		for _, v := range outbound.url {
-			providerPath := filepath.Join(C.BasePath(""), "provider", tag+"_"+md5V(v))
+			providerPath := filepath.Join(filemanager.BasePath(context.Background(), "provider"), tag+"_"+md5V(v))
 			outbound.path = append(outbound.path, providerPath)
 		}
 	}
@@ -222,10 +223,7 @@ func (s *Provider) updateSelected(outboundMap map[string]adapter.Outbound) error
 		s.logger.Debug("NewURLTestGroup ", len(outbounds))
 
 		s.group = NewURLTestGroup(context.Background(), s.router, s.logger, outbounds, s.urlTest.Url, interval, 100)
-		err = s.group.Start()
-		if err != nil {
-			s.logger.Error("start NewURLTestGroup err ", s.policy)
-		}
+		s.group.Start()
 		s.logger.Debug("start NewURLTestGroup")
 
 	case "loadBalance":

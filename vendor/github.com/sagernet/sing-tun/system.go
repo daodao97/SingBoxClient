@@ -10,6 +10,7 @@ import (
 	"github.com/sagernet/sing-tun/internal/clashtcpip"
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
+	"github.com/sagernet/sing/common/control"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
 	M "github.com/sagernet/sing/common/metadata"
@@ -20,6 +21,7 @@ import (
 type System struct {
 	ctx                context.Context
 	tun                Tun
+	tunName            string
 	mtu                uint32
 	router             Router
 	handler            Handler
@@ -38,6 +40,8 @@ type System struct {
 	tcpNat             *TCPNat
 	udpNat             *udpnat.Service[netip.AddrPort]
 	routeMapping       *RouteMapping
+	bindInterface      bool
+	interfaceFinder    control.InterfaceFinder
 }
 
 type Session struct {
@@ -49,16 +53,21 @@ type Session struct {
 
 func NewSystem(options StackOptions) (Stack, error) {
 	stack := &System{
-		ctx:           options.Context,
-		tun:           options.Tun,
-		mtu:           options.MTU,
-		udpTimeout:    options.UDPTimeout,
-		router:        options.Router,
-		handler:       options.Handler,
-		logger:        options.Logger,
-		inet4Prefixes: options.Inet4Address,
-		inet6Prefixes: options.Inet6Address,
-		routeMapping:  NewRouteMapping(options.UDPTimeout),
+		ctx:             options.Context,
+		tun:             options.Tun,
+		tunName:         options.Name,
+		mtu:             options.MTU,
+		udpTimeout:      options.UDPTimeout,
+		router:          options.Router,
+		handler:         options.Handler,
+		logger:          options.Logger,
+		inet4Prefixes:   options.Inet4Address,
+		inet6Prefixes:   options.Inet6Address,
+		bindInterface:   options.ForwarderBindInterface,
+		interfaceFinder: options.InterfaceFinder,
+	}
+	if stack.router != nil {
+		stack.routeMapping = NewRouteMapping(options.UDPTimeout)
 	}
 	if len(options.Inet4Address) > 0 {
 		if options.Inet4Address[0].Bits() == 32 {
@@ -88,8 +97,18 @@ func (s *System) Close() error {
 }
 
 func (s *System) Start() error {
+	var listener net.ListenConfig
+	if s.bindInterface {
+		listener.Control = control.Append(listener.Control, func(network, address string, conn syscall.RawConn) error {
+			err := control.BindToInterface(s.interfaceFinder, s.tunName, -1)(network, address, conn)
+			if err != nil {
+				s.logger.Warn("bind forwarder to interface: ", err)
+			}
+			return nil
+		})
+	}
 	if s.inet4Address.IsValid() {
-		tcpListener, err := net.Listen("tcp4", net.JoinHostPort(s.inet4ServerAddress.String(), "0"))
+		tcpListener, err := listener.Listen(s.ctx, "tcp4", net.JoinHostPort(s.inet4ServerAddress.String(), "0"))
 		if err != nil {
 			return err
 		}
@@ -98,7 +117,7 @@ func (s *System) Start() error {
 		go s.acceptLoop(tcpListener)
 	}
 	if s.inet6Address.IsValid() {
-		tcpListener, err := net.Listen("tcp6", net.JoinHostPort(s.inet6ServerAddress.String(), "0"))
+		tcpListener, err := listener.Listen(s.ctx, "tcp6", net.JoinHostPort(s.inet6ServerAddress.String(), "0"))
 		if err != nil {
 			return err
 		}
@@ -106,7 +125,7 @@ func (s *System) Start() error {
 		s.tcpPort6 = M.SocksaddrFromNet(tcpListener.Addr()).Port
 		go s.acceptLoop(tcpListener)
 	}
-	s.tcpNat = NewNat()
+	s.tcpNat = NewNat(s.ctx, time.Second*time.Duration(s.udpTimeout))
 	s.udpNat = udpnat.New[netip.AddrPort](s.udpTimeout, s.handler)
 	go s.tunLoop()
 	return nil
@@ -199,13 +218,14 @@ func (s *System) acceptLoop(listener net.Listener) {
 			}
 		}
 		go func() {
-			s.handler.NewConnection(s.ctx, conn, M.Metadata{
+			_ = s.handler.NewConnection(s.ctx, conn, M.Metadata{
 				Source:      M.SocksaddrFromNetIP(session.Source),
 				Destination: destination,
 			})
-			conn.Close()
-			time.Sleep(time.Second)
-			s.tcpNat.Revoke(connPort, session)
+			if tcpConn, isTCPConn := conn.(*net.TCPConn); isTCPConn {
+				_ = tcpConn.SetLinger(0)
+			}
+			_ = conn.Close()
 		}()
 	}
 }

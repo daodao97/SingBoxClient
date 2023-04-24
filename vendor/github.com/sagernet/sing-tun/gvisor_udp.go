@@ -15,6 +15,7 @@ import (
 
 	"gvisor.dev/gvisor/pkg/bufferv2"
 	"gvisor.dev/gvisor/pkg/tcpip"
+	"gvisor.dev/gvisor/pkg/tcpip/checksum"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
@@ -33,7 +34,7 @@ func NewUDPForwarder(ctx context.Context, stack *stack.Stack, handler Handler, u
 	}
 }
 
-func (f *UDPForwarder) HandlePacket(id stack.TransportEndpointID, pkt *stack.PacketBuffer) bool {
+func (f *UDPForwarder) HandlePacket(id stack.TransportEndpointID, pkt stack.PacketBufferPtr) bool {
 	var upstreamMetadata M.Metadata
 	upstreamMetadata.Source = M.SocksaddrFrom(M.AddrFromIP(net.IP(id.RemoteAddress)), id.RemotePort)
 	upstreamMetadata.Destination = M.SocksaddrFrom(M.AddrFromIP(net.IP(id.LocalAddress)), id.LocalPort)
@@ -93,9 +94,9 @@ func (w *UDPBackWriter) WritePacket(buffer *buf.Buffer, destination M.Socksaddr)
 	})
 
 	if route.RequiresTXTransportChecksum() && w.sourceNetwork == header.IPv6ProtocolNumber {
-		xsum := udpHdr.CalculateChecksum(header.ChecksumCombine(
+		xsum := udpHdr.CalculateChecksum(checksum.Combine(
 			route.PseudoHeaderChecksum(header.UDPProtocolNumber, pLen),
-			packet.Data().AsRange().Checksum(),
+			packet.Data().Checksum(),
 		))
 		if xsum != math.MaxUint16 {
 			xsum = ^xsum

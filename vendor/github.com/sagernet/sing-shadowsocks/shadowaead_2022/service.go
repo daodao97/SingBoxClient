@@ -21,7 +21,6 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	"github.com/sagernet/sing/common/cache"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
@@ -246,7 +245,7 @@ func (s *Service) newConnection(ctx context.Context, conn net.Conn, metadata M.M
 
 	metadata.Protocol = "shadowsocks"
 	metadata.Destination = destination
-	return s.handler.NewConnection(ctx, deadline.NewConn(protocolConn), metadata)
+	return s.handler.NewConnection(ctx, protocolConn, metadata)
 }
 
 type serverConn struct {
@@ -380,6 +379,10 @@ func (c *serverConn) Close() error {
 		common.PtrOrNil(c.reader),
 		common.PtrOrNil(c.writer),
 	)
+}
+
+func (c *serverConn) NeedAdditionalReadDeadline() bool {
+	return true
 }
 
 func (c *serverConn) Upstream() any {

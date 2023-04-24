@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  *
- * Copyright (C) 2017-2022 WireGuard LLC. All Rights Reserved.
+ * Copyright (C) 2017-2023 WireGuard LLC. All Rights Reserved.
  */
 
 package ipc
@@ -8,8 +8,9 @@ package ipc
 import (
 	"net"
 
-	"golang.org/x/sys/windows"
 	"github.com/sagernet/wireguard-go/ipc/namedpipe"
+
+	"golang.org/x/sys/windows"
 )
 
 // TODO: replace these with actual standard windows error numbers from the win package

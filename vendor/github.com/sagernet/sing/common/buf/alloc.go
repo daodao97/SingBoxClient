@@ -5,7 +5,6 @@ package buf
 import (
 	"errors"
 	"math/bits"
-	"strconv"
 	"sync"
 )
 
@@ -39,7 +38,7 @@ func newDefaultAllocer() Allocator {
 // Get a []byte from pool with most appropriate cap
 func (alloc *defaultAllocator) Get(size int) []byte {
 	if size <= 0 || size > 65536 {
-		panic("alloc bad size: " + strconv.Itoa(size))
+		return nil
 	}
 
 	bits := msb(size)

@@ -11,11 +11,21 @@ import (
 
 type Conn struct {
 	N.ExtendedConn
-	reader *Reader
+	reader Reader
 }
 
 func NewConn(conn net.Conn) *Conn {
+	if deadlineConn, isDeadline := conn.(*Conn); isDeadline {
+		return deadlineConn
+	}
 	return &Conn{ExtendedConn: bufio.NewExtendedConn(conn), reader: NewReader(conn)}
+}
+
+func NewFallbackConn(conn net.Conn) *Conn {
+	if deadlineConn, isDeadline := conn.(*Conn); isDeadline {
+		return deadlineConn
+	}
+	return &Conn{ExtendedConn: bufio.NewExtendedConn(conn), reader: NewFallbackReader(conn)}
 }
 
 func (c *Conn) Read(p []byte) (n int, err error) {
@@ -44,4 +54,8 @@ func (c *Conn) WriterReplaceable() bool {
 
 func (c *Conn) Upstream() any {
 	return c.ExtendedConn
+}
+
+func (c *Conn) NeedAdditionalReadDeadline() bool {
+	return false
 }

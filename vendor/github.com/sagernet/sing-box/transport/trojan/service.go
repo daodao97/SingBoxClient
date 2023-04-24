@@ -8,7 +8,6 @@ import (
 	"github.com/sagernet/sing/common/auth"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -107,7 +106,7 @@ func (s *Service[K]) NewConnection(ctx context.Context, conn net.Conn, metadata 
 	case CommandTCP:
 		return s.handler.NewConnection(ctx, conn, metadata)
 	case CommandUDP:
-		return s.handler.NewPacketConnection(ctx, deadline.NewPacketConn(bufio.NewNetPacketConn(&PacketConn{conn})), metadata)
+		return s.handler.NewPacketConnection(ctx, &PacketConn{conn}, metadata)
 	// case CommandMux:
 	default:
 		return HandleMuxConnection(ctx, conn, metadata, s.handler)
@@ -136,4 +135,12 @@ func (c *PacketConn) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) er
 
 func (c *PacketConn) FrontHeadroom() int {
 	return M.MaxSocksaddrLength + 4
+}
+
+func (c *PacketConn) NeedAdditionalReadDeadline() bool {
+	return true
+}
+
+func (c *PacketConn) Upstream() any {
+	return c.Conn
 }

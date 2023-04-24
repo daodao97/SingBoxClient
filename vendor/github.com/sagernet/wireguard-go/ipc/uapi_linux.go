@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  *
- * Copyright (C) 2017-2022 WireGuard LLC. All Rights Reserved.
+ * Copyright (C) 2017-2023 WireGuard LLC. All Rights Reserved.
  */
 
 package ipc
@@ -9,8 +9,9 @@ import (
 	"net"
 	"os"
 
-	"golang.org/x/sys/unix"
 	"github.com/sagernet/wireguard-go/rwcancel"
+
+	"golang.org/x/sys/unix"
 )
 
 type UAPIListener struct {
@@ -96,7 +97,7 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 	}
 
 	go func(l *UAPIListener) {
-		var buff [0]byte
+		var buf [0]byte
 		for {
 			defer uapi.inotifyRWCancel.Close()
 			// start with lstat to avoid race condition
@@ -104,7 +105,7 @@ func UAPIListen(name string, file *os.File) (net.Listener, error) {
 				l.connErr <- err
 				return
 			}
-			_, err := uapi.inotifyRWCancel.Read(buff[:])
+			_, err := uapi.inotifyRWCancel.Read(buf[:])
 			if err != nil {
 				l.connErr <- err
 				return

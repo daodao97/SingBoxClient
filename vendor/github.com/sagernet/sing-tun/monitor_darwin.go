@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -83,29 +84,114 @@ func (m *defaultInterfaceMonitor) checkUpdate() error {
 	if err != nil {
 		return err
 	}
+	var defaultInterface *net.Interface
 	for _, rawRouteMessage := range routeMessages {
 		routeMessage := rawRouteMessage.(*route.RouteMessage)
-		if common.Any(common.FilterIsInstance(routeMessage.Addrs, func(it route.Addr) (*route.Inet4Addr, bool) {
-			addr, loaded := it.(*route.Inet4Addr)
-			return addr, loaded
-		}), func(addr *route.Inet4Addr) bool {
-			return addr.IP == netip.IPv4Unspecified().As4()
-		}) {
-			oldInterface := m.defaultInterfaceName
-			oldIndex := m.defaultInterfaceIndex
-
-			m.defaultInterfaceIndex = routeMessage.Index
-			defaultInterface, err := net.InterfaceByIndex(routeMessage.Index)
-			if err != nil {
-				return err
-			}
-			m.defaultInterfaceName = defaultInterface.Name
-			if oldInterface == m.defaultInterfaceName && oldIndex == m.defaultInterfaceIndex {
-				return nil
-			}
-			m.emit(EventInterfaceUpdate)
-			return nil
+		if len(routeMessage.Addrs) <= unix.RTAX_NETMASK {
+			continue
+		}
+		destination, isIPv4Destination := routeMessage.Addrs[unix.RTAX_DST].(*route.Inet4Addr)
+		if !isIPv4Destination {
+			continue
+		}
+		if destination.IP != netip.IPv4Unspecified().As4() {
+			continue
+		}
+		mask, isIPv4Mask := routeMessage.Addrs[unix.RTAX_NETMASK].(*route.Inet4Addr)
+		if !isIPv4Mask {
+			continue
+		}
+		ones, _ := net.IPMask(mask.IP[:]).Size()
+		if ones != 0 {
+			continue
+		}
+		routeInterface, err := net.InterfaceByIndex(routeMessage.Index)
+		if err != nil {
+			return err
+		}
+		if routeMessage.Flags&unix.RTF_UP == 0 {
+			continue
+		}
+		if routeMessage.Flags&unix.RTF_GATEWAY == 0 {
+			continue
+		}
+		if routeMessage.Flags&unix.RTF_IFSCOPE != 0 {
+			continue
+		}
+		defaultInterface = routeInterface
+		break
+	}
+	if defaultInterface == nil {
+		defaultInterface, err = getDefaultInterfaceBySocket()
+		if err != nil {
+			return err
 		}
 	}
-	return ErrNoRoute
+	oldInterface := m.defaultInterfaceName
+	oldIndex := m.defaultInterfaceIndex
+	m.defaultInterfaceIndex = defaultInterface.Index
+	m.defaultInterfaceName = defaultInterface.Name
+	if oldInterface == m.defaultInterfaceName && oldIndex == m.defaultInterfaceIndex {
+		return nil
+	}
+	m.emit(EventInterfaceUpdate)
+	return nil
+}
+
+func getDefaultInterfaceBySocket() (*net.Interface, error) {
+	socketFd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM, 0)
+	if err != nil {
+		return nil, E.Cause(err, "create file descriptor")
+	}
+	defer unix.Close(socketFd)
+	go unix.Connect(socketFd, &unix.SockaddrInet4{
+		Addr: [4]byte{10, 255, 255, 255},
+		Port: 80,
+	})
+	result := make(chan netip.Addr, 1)
+	go func() {
+		for {
+			sockname, sockErr := unix.Getsockname(socketFd)
+			if sockErr != nil {
+				break
+			}
+			sockaddr, isInet4Sockaddr := sockname.(*unix.SockaddrInet4)
+			if !isInet4Sockaddr {
+				break
+			}
+			addr := netip.AddrFrom4(sockaddr.Addr)
+			if addr.IsUnspecified() {
+				time.Sleep(time.Millisecond)
+				continue
+			}
+			result <- addr
+			break
+		}
+	}()
+	var selectedAddr netip.Addr
+	select {
+	case selectedAddr = <-result:
+	case <-time.After(time.Second):
+		return nil, os.ErrDeadlineExceeded
+	}
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, E.Cause(err, "net.Interfaces")
+	}
+	for _, netInterface := range interfaces {
+		interfaceAddrs, err := netInterface.Addrs()
+		if err != nil {
+			return nil, E.Cause(err, "net.Interfaces.Addrs")
+		}
+		for _, interfaceAddr := range interfaceAddrs {
+			ipNet, isIPNet := interfaceAddr.(*net.IPNet)
+			if !isIPNet {
+				continue
+			}
+			if ipNet.Contains(selectedAddr.AsSlice()) {
+				return &netInterface, nil
+			}
+		}
+	}
+	return nil, E.New("no interface found for address ", selectedAddr)
 }

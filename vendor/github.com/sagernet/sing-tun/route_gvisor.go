@@ -10,7 +10,7 @@ import (
 
 type DirectDestination interface {
 	WritePacket(buffer *buf.Buffer) error
-	WritePacketBuffer(buffer *stack.PacketBuffer) error
+	WritePacketBuffer(buffer stack.PacketBufferPtr) error
 	Close() error
 	Timeout() bool
 }

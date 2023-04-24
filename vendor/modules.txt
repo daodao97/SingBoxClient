@@ -2,7 +2,7 @@
 ## explicit; go 1.13
 berty.tech/go-libtor
 berty.tech/go-libtor/libtor
-# github.com/Dreamacro/clash v1.14.0
+# github.com/Dreamacro/clash v1.15.0
 ## explicit; go 1.20
 github.com/Dreamacro/clash/common/pool
 github.com/Dreamacro/clash/component/auth
@@ -263,13 +263,14 @@ github.com/sagernet/quic-go/quicvarint
 # github.com/sagernet/reality v0.0.0-20230406110435-ee17307e7691
 ## explicit; go 1.18
 github.com/sagernet/reality
-# github.com/sagernet/sing v0.2.3-0.20230413023204-48b019b13e78
+# github.com/sagernet/sing v0.2.5-0.20230423085534-0902e6216207
 ## explicit; go 1.18
 github.com/sagernet/sing/common
 github.com/sagernet/sing/common/abx
 github.com/sagernet/sing/common/abx/internal
 github.com/sagernet/sing/common/atomic
 github.com/sagernet/sing/common/auth
+github.com/sagernet/sing/common/baderror
 github.com/sagernet/sing/common/batch
 github.com/sagernet/sing/common/buf
 github.com/sagernet/sing/common/bufio
@@ -290,7 +291,6 @@ github.com/sagernet/sing/common/random
 github.com/sagernet/sing/common/ranges
 github.com/sagernet/sing/common/replay
 github.com/sagernet/sing/common/rw
-github.com/sagernet/sing/common/service
 github.com/sagernet/sing/common/shell
 github.com/sagernet/sing/common/task
 github.com/sagernet/sing/common/tls
@@ -306,7 +306,9 @@ github.com/sagernet/sing/protocol/http
 github.com/sagernet/sing/protocol/socks
 github.com/sagernet/sing/protocol/socks/socks4
 github.com/sagernet/sing/protocol/socks/socks5
-# github.com/sagernet/sing-box v1.0.3 => ../sing-box
+github.com/sagernet/sing/service
+github.com/sagernet/sing/service/filemanager
+# github.com/sagernet/sing-box v1.0.3 => ../sb
 ## explicit; go 1.18
 github.com/sagernet/sing-box
 github.com/sagernet/sing-box/adapter
@@ -328,7 +330,6 @@ github.com/sagernet/sing-box/common/sniff/internal/qtls
 github.com/sagernet/sing-box/common/timer
 github.com/sagernet/sing-box/common/tls
 github.com/sagernet/sing-box/common/urltest
-github.com/sagernet/sing-box/common/warning
 github.com/sagernet/sing-box/common/xtype
 github.com/sagernet/sing-box/constant
 github.com/sagernet/sing-box/constant/goos
@@ -364,31 +365,36 @@ github.com/sagernet/sing-box/transport/v2rayquic
 github.com/sagernet/sing-box/transport/v2raywebsocket
 github.com/sagernet/sing-box/transport/vless
 github.com/sagernet/sing-box/transport/wireguard
-# github.com/sagernet/sing-dns v0.1.5-0.20230408004833-5adaf486d440
+# github.com/sagernet/sing-dns v0.1.5-0.20230415085626-111ecf799dfc
 ## explicit; go 1.18
 github.com/sagernet/sing-dns
 github.com/sagernet/sing-dns/quic
-# github.com/sagernet/sing-shadowsocks v0.2.1-0.20230412123110-1a7c32b4e2e7
+# github.com/sagernet/sing-mux v0.0.0-20230424015424-9b0d527c3bb0
+## explicit; go 1.18
+github.com/sagernet/sing-mux
+# github.com/sagernet/sing-shadowsocks v0.2.2-0.20230417102954-f77257340507
 ## explicit; go 1.18
 github.com/sagernet/sing-shadowsocks
 github.com/sagernet/sing-shadowsocks/shadowaead
 github.com/sagernet/sing-shadowsocks/shadowaead_2022
 github.com/sagernet/sing-shadowsocks/shadowimpl
 github.com/sagernet/sing-shadowsocks/shadowstream
-# github.com/sagernet/sing-shadowtls v0.1.1-0.20230409094821-9abef019436f
+# github.com/sagernet/sing-shadowtls v0.1.2-0.20230417103049-4f682e05f19b
 ## explicit; go 1.18
 github.com/sagernet/sing-shadowtls
 github.com/sagernet/sing-shadowtls/tls
 github.com/sagernet/sing-shadowtls/tls_compact
-# github.com/sagernet/sing-tun v0.1.4-0.20230326080954-8848c0e4cbab
+# github.com/sagernet/sing-tun v0.1.5-0.20230422121432-209ec123ca7b
 ## explicit; go 1.18
 github.com/sagernet/sing-tun
 github.com/sagernet/sing-tun/internal/clashtcpip
+github.com/sagernet/sing-tun/internal/fdbased
+github.com/sagernet/sing-tun/internal/fdbased/stopfd
 github.com/sagernet/sing-tun/internal/winipcfg
 github.com/sagernet/sing-tun/internal/winsys
 github.com/sagernet/sing-tun/internal/wintun
 github.com/sagernet/sing-tun/internal/wintun/memmod
-# github.com/sagernet/sing-vmess v0.1.4-0.20230412122845-9470e68f5e45
+# github.com/sagernet/sing-vmess v0.1.5-0.20230417103030-8c3070ae3fb3
 ## explicit; go 1.18
 github.com/sagernet/sing-vmess
 github.com/sagernet/sing-vmess/packetaddr
@@ -404,8 +410,8 @@ github.com/sagernet/utls
 # github.com/sagernet/websocket v0.0.0-20220913015213-615516348b4e
 ## explicit; go 1.12
 github.com/sagernet/websocket
-# github.com/sagernet/wireguard-go v0.0.0-20221116151939-c99467f53f2c
-## explicit; go 1.18
+# github.com/sagernet/wireguard-go v0.0.0-20230420044414-a7bac1754e77
+## explicit; go 1.20
 github.com/sagernet/wireguard-go/conn
 github.com/sagernet/wireguard-go/conn/winrio
 github.com/sagernet/wireguard-go/device
@@ -519,7 +525,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+# golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 ## explicit
 golang.org/x/time/rate
 # golang.org/x/tools v0.6.0
@@ -634,8 +640,8 @@ google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2
-# gvisor.dev/gvisor v0.0.0-20220901235040-6ca97ef2ce1c
-## explicit; go 1.17
+# gvisor.dev/gvisor v0.0.0-20230415003630-3981d5d5e523
+## explicit; go 1.20
 gvisor.dev/gvisor/pkg/atomicbitops
 gvisor.dev/gvisor/pkg/bits
 gvisor.dev/gvisor/pkg/bufferv2
@@ -647,18 +653,18 @@ gvisor.dev/gvisor/pkg/linewriter
 gvisor.dev/gvisor/pkg/log
 gvisor.dev/gvisor/pkg/rand
 gvisor.dev/gvisor/pkg/refs
-gvisor.dev/gvisor/pkg/refsvfs2
 gvisor.dev/gvisor/pkg/sleep
 gvisor.dev/gvisor/pkg/state
 gvisor.dev/gvisor/pkg/state/wire
 gvisor.dev/gvisor/pkg/sync
+gvisor.dev/gvisor/pkg/sync/locking
 gvisor.dev/gvisor/pkg/tcpip
 gvisor.dev/gvisor/pkg/tcpip/adapters/gonet
+gvisor.dev/gvisor/pkg/tcpip/checksum
 gvisor.dev/gvisor/pkg/tcpip/hash/jenkins
 gvisor.dev/gvisor/pkg/tcpip/header
 gvisor.dev/gvisor/pkg/tcpip/header/parse
 gvisor.dev/gvisor/pkg/tcpip/internal/tcp
-gvisor.dev/gvisor/pkg/tcpip/link/fdbased
 gvisor.dev/gvisor/pkg/tcpip/link/rawfile
 gvisor.dev/gvisor/pkg/tcpip/network/hash
 gvisor.dev/gvisor/pkg/tcpip/network/internal/fragmentation
@@ -683,4 +689,4 @@ gvisor.dev/gvisor/pkg/waiter
 ## explicit; go 1.13
 lukechampine.com/blake3
 # github.com/getlantern/notifier => ../notifier
-# github.com/sagernet/sing-box => ../sing-box
+# github.com/sagernet/sing-box => ../sb

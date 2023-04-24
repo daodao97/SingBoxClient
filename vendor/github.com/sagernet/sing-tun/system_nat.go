@@ -1,8 +1,10 @@
 package tun
 
 import (
+	"context"
 	"net/netip"
 	"sync"
+	"time"
 )
 
 type TCPNat struct {
@@ -16,20 +18,54 @@ type TCPNat struct {
 type TCPSession struct {
 	Source      netip.AddrPort
 	Destination netip.AddrPort
+	LastActive  time.Time
 }
 
-func NewNat() *TCPNat {
-	return &TCPNat{
+func NewNat(ctx context.Context, timeout time.Duration) *TCPNat {
+	natMap := &TCPNat{
 		portIndex: 10000,
 		addrMap:   make(map[netip.AddrPort]uint16),
 		portMap:   make(map[uint16]*TCPSession),
+	}
+	go natMap.loopCheckTimeout(ctx, timeout)
+	return natMap
+}
+
+func (n *TCPNat) loopCheckTimeout(ctx context.Context, timeout time.Duration) {
+	ticker := time.NewTicker(timeout)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			n.checkTimeout(timeout)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (n *TCPNat) checkTimeout(timeout time.Duration) {
+	now := time.Now()
+	n.portAccess.Lock()
+	defer n.portAccess.Unlock()
+	n.addrAccess.Lock()
+	defer n.addrAccess.Unlock()
+	for natPort, session := range n.portMap {
+		if now.Sub(session.LastActive) > timeout {
+			delete(n.addrMap, session.Source)
+			delete(n.portMap, natPort)
+		}
 	}
 }
 
 func (n *TCPNat) LookupBack(port uint16) *TCPSession {
 	n.portAccess.RLock()
-	defer n.portAccess.RUnlock()
-	return n.portMap[port]
+	session := n.portMap[port]
+	n.portAccess.RUnlock()
+	if session != nil {
+		session.LastActive = time.Now()
+	}
+	return session
 }
 
 func (n *TCPNat) Lookup(source netip.AddrPort, destination netip.AddrPort) uint16 {
@@ -53,16 +89,8 @@ func (n *TCPNat) Lookup(source netip.AddrPort, destination netip.AddrPort) uint1
 	n.portMap[nextPort] = &TCPSession{
 		Source:      source,
 		Destination: destination,
+		LastActive:  time.Now(),
 	}
 	n.portAccess.Unlock()
 	return nextPort
-}
-
-func (n *TCPNat) Revoke(natPort uint16, session *TCPSession) {
-	n.addrAccess.Lock()
-	delete(n.addrMap, session.Source)
-	n.addrAccess.Unlock()
-	n.portAccess.Lock()
-	delete(n.portMap, natPort)
-	n.portAccess.Unlock()
 }

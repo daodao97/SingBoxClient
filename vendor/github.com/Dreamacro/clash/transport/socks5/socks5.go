@@ -159,7 +159,7 @@ func ServerHandshake(rw net.Conn, authenticator auth.Authenticator) (addr Addr, 
 		pass := string(authBuf[:passLen])
 
 		// Verify
-		if ok := authenticator.Verify(string(user), string(pass)); !ok {
+		if ok := authenticator.Verify(user, pass); !ok {
 			rw.Write([]byte{1, 1})
 			err = ErrAuth
 			return

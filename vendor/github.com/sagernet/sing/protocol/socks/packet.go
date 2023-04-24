@@ -1,6 +1,7 @@
 package socks
 
 import (
+	"bytes"
 	"net"
 
 	"github.com/sagernet/sing/common"
@@ -44,19 +45,19 @@ func (c *AssociatePacketConn) RemoteAddr() net.Addr {
 
 //warn:unsafe
 func (c *AssociatePacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	buffer := buf.With(p)
-	n, addr, err = bufio.ReadPacket(c.NetPacketConn, buffer)
+	n, addr, err = c.NetPacketConn.ReadFrom(p)
 	if err != nil {
 		return
 	}
 	c.remoteAddr = M.SocksaddrFromNet(addr)
-	buffer.Advance(3)
-	destination, err := M.SocksaddrSerializer.ReadAddrPort(buffer)
+	reader := bytes.NewReader(p[3:n])
+	destination, err := M.SocksaddrSerializer.ReadAddrPort(reader)
 	if err != nil {
 		return
 	}
 	addr = destination.UDPAddr()
-	n = copy(p, buffer.Bytes())
+	index := 3 + int(reader.Size()) - reader.Len()
+	n = copy(p, p[index:n])
 	return
 }
 
@@ -89,11 +90,11 @@ func (c *AssociatePacketConn) Write(b []byte) (n int, err error) {
 }
 
 func (c *AssociatePacketConn) ReadPacket(buffer *buf.Buffer) (M.Socksaddr, error) {
-	_, addr, err := bufio.ReadPacket(c.NetPacketConn, buffer)
+	destination, err := c.NetPacketConn.ReadPacket(buffer)
 	if err != nil {
 		return M.Socksaddr{}, err
 	}
-	c.remoteAddr = M.SocksaddrFromNet(addr)
+	c.remoteAddr = destination
 	buffer.Advance(3)
 	dest, err := M.SocksaddrSerializer.ReadAddrPort(buffer)
 	return dest, err

@@ -1,8 +1,8 @@
-//go:build linux || darwin || freebsd || openbsd || dragonfly
+//go:build linux || darwin || freebsd || openbsd
 
 /* SPDX-License-Identifier: MIT
  *
- * Copyright (C) 2017-2022 WireGuard LLC. All Rights Reserved.
+ * Copyright (C) 2017-2023 WireGuard LLC. All Rights Reserved.
  */
 
 package ipc
@@ -14,6 +14,14 @@ import (
 	"os"
 
 	"golang.org/x/sys/unix"
+)
+
+const (
+	IpcErrorIO        = -int64(unix.EIO)
+	IpcErrorProtocol  = -int64(unix.EPROTO)
+	IpcErrorInvalid   = -int64(unix.EINVAL)
+	IpcErrorPortInUse = -int64(unix.EADDRINUSE)
+	IpcErrorUnknown   = -55 // ENOANO
 )
 
 // socketDirectory is variable because it is modified by a linker

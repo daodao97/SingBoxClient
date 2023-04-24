@@ -10,12 +10,14 @@ import (
 	N "github.com/sagernet/sing/common/network"
 )
 
+// Deprecated: bad usage
 func ReadBuffer(reader N.ExtendedReader, buffer *buf.Buffer) (n int, err error) {
 	n, err = reader.Read(buffer.FreeBytes())
 	buffer.Truncate(n)
 	return
 }
 
+// Deprecated: bad usage
 func ReadPacket(reader N.PacketReader, buffer *buf.Buffer) (n int, addr net.Addr, err error) {
 	startLen := buffer.Len()
 	addr, err = reader.ReadPacket(buffer)

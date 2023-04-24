@@ -12,7 +12,6 @@ import (
 	"github.com/sagernet/sing/common/auth"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	"github.com/sagernet/sing/common/debug"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
@@ -145,7 +144,7 @@ func (s *Service) NewConnection(ctx context.Context, conn net.Conn, metadata M.M
 		if err == nil {
 			s.logger.TraceContext(ctx, "handshake finished")
 			handshakeConn.Close()
-			return s.handler.NewConnection(ctx, bufio.NewCachedConn(deadline.NewConn(newConn(conn)), request), metadata)
+			return s.handler.NewConnection(ctx, bufio.NewCachedConn(newConn(conn), request), metadata)
 		} else if err == os.ErrPermission {
 			s.logger.WarnContext(ctx, "fallback connection")
 			hashConn.Fallback()
@@ -248,6 +247,6 @@ func (s *Service) NewConnection(ctx context.Context, conn net.Conn, metadata M.M
 			return E.Cause(err, "handshake relay")
 		}
 		s.logger.TraceContext(ctx, "handshake relay finished")
-		return s.handler.NewConnection(ctx, bufio.NewCachedConn(deadline.NewConn(newVerifiedConn(conn, hmacAdd, hmacVerify, nil)), clientFirstFrame), metadata)
+		return s.handler.NewConnection(ctx, bufio.NewCachedConn(newVerifiedConn(conn, hmacAdd, hmacVerify, nil), clientFirstFrame), metadata)
 	}
 }

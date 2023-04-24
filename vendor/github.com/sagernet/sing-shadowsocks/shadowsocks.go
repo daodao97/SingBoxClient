@@ -14,6 +14,7 @@ import (
 var (
 	ErrBadKey          = E.New("bad key")
 	ErrMissingPassword = E.New("missing password")
+	ErrNoUsers         = E.New("no users")
 )
 
 type Method interface {
@@ -26,6 +27,15 @@ type Method interface {
 type Service interface {
 	Name() string
 	Password() string
+	N.TCPConnectionHandler
+	N.UDPHandler
+	E.Handler
+}
+
+type MultiService[U comparable] interface {
+	Name() string
+	UpdateUsers(userList []U, keyList [][]byte) error
+	UpdateUsersWithPasswords(userList []U, passwordList []string) error
 	N.TCPConnectionHandler
 	N.UDPHandler
 	E.Handler

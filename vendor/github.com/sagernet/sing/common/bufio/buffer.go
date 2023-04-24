@@ -67,7 +67,8 @@ func (r *BufferedReader) ReadBuffer(buffer *buf.Buffer) error {
 	return err
 }
 
-func (r *BufferedReader) WriteTo(w io.Writer) (n int64, err error) {
+//TODO: add CopyBuffer
+/*func (r *BufferedReader) WriteTo(w io.Writer) (n int64, err error) {
 	if r.buffer == nil {
 		return Copy(w, r.upstream)
 	}
@@ -76,7 +77,7 @@ func (r *BufferedReader) WriteTo(w io.Writer) (n int64, err error) {
 	}
 	defer r.buffer.Release()
 	return CopyExtendedBuffer(NewExtendedWriter(w), NewExtendedReader(r.upstream), r.buffer)
-}
+}*/
 
 func (r *BufferedReader) ReadCached() *buf.Buffer {
 	buffer := r.buffer
@@ -150,12 +151,12 @@ func (w *BufferedWriter) Fallthrough() error {
 	return nil
 }
 
-func (w *BufferedWriter) ReadFrom(r io.Reader) (n int64, err error) {
+/*func (w *BufferedWriter) ReadFrom(r io.Reader) (n int64, err error) {
 	if w.buffer == nil {
 		return Copy(w.upstream, r)
 	}
 	return CopyExtendedBuffer(NewExtendedWriter(w), NewExtendedReader(r), w.buffer)
-}
+}*/
 
 func (w *BufferedWriter) WriterReplaceable() bool {
 	return w.buffer == nil

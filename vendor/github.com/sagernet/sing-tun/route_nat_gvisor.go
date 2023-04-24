@@ -8,7 +8,7 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
 
-func (w *NatWriter) RewritePacketBuffer(packetBuffer *stack.PacketBuffer) {
+func (w *NatWriter) RewritePacketBuffer(packetBuffer stack.PacketBufferPtr) {
 	var bindAddr tcpip.Address
 	if packetBuffer.NetworkProtocolNumber == header.IPv4ProtocolNumber {
 		bindAddr = tcpip.Address(w.inet4Address.AsSlice())

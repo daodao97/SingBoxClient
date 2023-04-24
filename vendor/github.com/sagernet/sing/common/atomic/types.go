@@ -13,3 +13,7 @@ type (
 	Uintptr = atomic.Uintptr
 	Value   = atomic.Value
 )
+
+type Pointer[T any] struct {
+	atomic.Pointer[T]
+}

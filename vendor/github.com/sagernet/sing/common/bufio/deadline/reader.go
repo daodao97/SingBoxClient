@@ -3,126 +3,165 @@ package deadline
 import (
 	"io"
 	"os"
-	"sync"
 	"time"
 
+	"github.com/sagernet/sing/common/atomic"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
 	N "github.com/sagernet/sing/common/network"
 )
 
-type Reader struct {
+type TimeoutReader interface {
+	io.Reader
+	SetReadDeadline(t time.Time) error
+}
+
+type Reader interface {
 	N.ExtendedReader
-	deadline     time.Time
-	pipeDeadline pipeDeadline
-	cacheAccess  sync.RWMutex
-	cached       bool
-	cachedBuffer *buf.Buffer
-	cachedErr    error
+	TimeoutReader
+	N.WithUpstreamReader
+	N.ReaderWithUpstream
 }
 
-func NewReader(reader io.Reader) *Reader {
-	return &Reader{ExtendedReader: bufio.NewExtendedReader(reader), pipeDeadline: makePipeDeadline()}
+type reader struct {
+	N.ExtendedReader
+	timeoutReader TimeoutReader
+	deadline      atomic.TypedValue[time.Time]
+	pipeDeadline  pipeDeadline
+	result        chan *readResult
+	done          chan struct{}
 }
 
-func (r *Reader) Read(p []byte) (n int, err error) {
-	r.cacheAccess.Lock()
-	if r.cached {
-		n = copy(p, r.cachedBuffer.Bytes())
-		err = r.cachedErr
-		r.cachedBuffer.Advance(n)
-		if r.cachedBuffer.IsEmpty() {
-			r.cachedBuffer.Release()
-			r.cached = false
-		}
-		r.cacheAccess.Unlock()
-		return
+type readResult struct {
+	buffer *buf.Buffer
+	err    error
+}
+
+func NewReader(timeoutReader TimeoutReader) Reader {
+	return &reader{
+		ExtendedReader: bufio.NewExtendedReader(timeoutReader),
+		timeoutReader:  timeoutReader,
+		pipeDeadline:   makePipeDeadline(),
+		result:         make(chan *readResult, 1),
+		done:           makeFilledChan(),
 	}
-	r.cacheAccess.Unlock()
-	done := make(chan struct{})
-	go func() {
-		n, err = r.pipeRead(p, r.pipeDeadline.wait())
-		close(done)
-	}()
+}
+
+func (r *reader) Read(p []byte) (n int, err error) {
 	select {
-	case <-done:
-		return
+	case result := <-r.result:
+		return r.pipeReturn(result, p)
+	default:
+	}
+	select {
+	case <-r.done:
+		go r.pipeRead(len(p))
+	default:
+	}
+	return r.read(p)
+}
+
+func (r *reader) read(p []byte) (n int, err error) {
+	select {
+	case result := <-r.result:
+		return r.pipeReturn(result, p)
 	case <-r.pipeDeadline.wait():
 		return 0, os.ErrDeadlineExceeded
 	}
 }
 
-func (r *Reader) pipeRead(p []byte, cancel chan struct{}) (n int, err error) {
-	r.cacheAccess.Lock()
-	defer r.cacheAccess.Unlock()
-	buffer := buf.NewSize(len(p))
-	n, err = buffer.ReadOnceFrom(r.ExtendedReader)
-	if isClosedChan(cancel) {
-		r.cached = true
-		r.cachedBuffer = buffer
-		r.cachedErr = err
+func (r *reader) pipeReturn(result *readResult, p []byte) (n int, err error) {
+	n = copy(p, result.buffer.Bytes())
+	result.buffer.Advance(n)
+	if result.buffer.IsEmpty() {
+		result.buffer.Release()
+		err = result.err
 	} else {
-		n = copy(p, buffer.Bytes())
-		buffer.Release()
+		r.result <- result
 	}
 	return
 }
 
-func (r *Reader) ReadBuffer(buffer *buf.Buffer) error {
-	r.cacheAccess.Lock()
-	if r.cached {
-		n := copy(buffer.FreeBytes(), r.cachedBuffer.Bytes())
-		err := r.cachedErr
-		buffer.Resize(buffer.Start(), n)
-		r.cachedBuffer.Advance(n)
-		if r.cachedBuffer.IsEmpty() {
-			r.cachedBuffer.Release()
-			r.cached = false
-		}
-		r.cacheAccess.Unlock()
-		return err
+func (r *reader) pipeRead(pLen int) {
+	buffer := buf.NewSize(pLen)
+	_, err := buffer.ReadOnceFrom(r.ExtendedReader)
+	r.result <- &readResult{
+		buffer: buffer,
+		err:    err,
 	}
-	r.cacheAccess.Unlock()
-	done := make(chan struct{})
-	var err error
-	go func() {
-		err = r.pipeReadBuffer(buffer, r.pipeDeadline.wait())
-		close(done)
-	}()
+	r.done <- struct{}{}
+}
+
+func (r *reader) ReadBuffer(buffer *buf.Buffer) error {
 	select {
-	case <-done:
-		return err
+	case result := <-r.result:
+		return r.pipeReturnBuffer(result, buffer)
+	default:
+	}
+	select {
+	case <-r.done:
+		go r.pipeReadBuffer(buffer.Cap(), buffer.Start())
+	default:
+	}
+	return r.readBuffer(buffer)
+}
+
+func (r *reader) readBuffer(buffer *buf.Buffer) error {
+	select {
+	case result := <-r.result:
+		return r.pipeReturnBuffer(result, buffer)
 	case <-r.pipeDeadline.wait():
 		return os.ErrDeadlineExceeded
 	}
 }
 
-func (r *Reader) pipeReadBuffer(buffer *buf.Buffer, cancel chan struct{}) error {
-	r.cacheAccess.Lock()
-	defer r.cacheAccess.Unlock()
-	cacheBuffer := buf.NewSize(buffer.FreeLen())
-	err := r.ExtendedReader.ReadBuffer(cacheBuffer)
-	if isClosedChan(cancel) {
-		r.cached = true
-		r.cachedBuffer = cacheBuffer
-		r.cachedErr = err
+func (r *reader) pipeReturnBuffer(result *readResult, buffer *buf.Buffer) error {
+	buffer.Resize(result.buffer.Start(), 0)
+	n := copy(buffer.FreeBytes(), result.buffer.Bytes())
+	buffer.Truncate(n)
+	result.buffer.Advance(n)
+	if !result.buffer.IsEmpty() {
+		r.result <- result
+		return nil
 	} else {
-		buffer.ReadOnceFrom(cacheBuffer)
-		cacheBuffer.Release()
+		result.buffer.Release()
+		return result.err
 	}
-	return err
 }
 
-func (r *Reader) SetReadDeadline(t time.Time) error {
-	r.deadline = t
+func (r *reader) pipeReadBuffer(bufLen int, bufStart int) {
+	cacheBuffer := buf.NewSize(bufLen)
+	cacheBuffer.Advance(bufStart)
+	err := r.ExtendedReader.ReadBuffer(cacheBuffer)
+	r.result <- &readResult{
+		buffer: cacheBuffer,
+		err:    err,
+	}
+	r.done <- struct{}{}
+}
+
+func (r *reader) SetReadDeadline(t time.Time) error {
+	r.deadline.Store(t)
 	r.pipeDeadline.set(t)
 	return nil
 }
 
-func (r *Reader) ReaderReplaceable() bool {
-	return r.deadline.IsZero()
+func (r *reader) ReaderReplaceable() bool {
+	select {
+	case <-r.done:
+		r.done <- struct{}{}
+	default:
+		return false
+	}
+	select {
+	case result := <-r.result:
+		r.result <- result
+		return false
+	default:
+	}
+	return r.deadline.Load().IsZero()
 }
 
-func (r *Reader) UpstreamReader() any {
+func (r *reader) UpstreamReader() any {
 	return r.ExtendedReader
 }

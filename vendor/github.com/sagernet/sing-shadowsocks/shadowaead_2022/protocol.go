@@ -22,7 +22,6 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -199,15 +198,15 @@ func (m *Method) DialConn(conn net.Conn, destination M.Socksaddr) (net.Conn, err
 		Conn:        conn,
 		destination: destination,
 	}
-	return deadline.NewConn(shadowsocksConn), shadowsocksConn.writeRequest(nil)
+	return shadowsocksConn, shadowsocksConn.writeRequest(nil)
 }
 
 func (m *Method) DialEarlyConn(conn net.Conn, destination M.Socksaddr) net.Conn {
-	return deadline.NewConn(&clientConn{
+	return &clientConn{
 		Method:      m,
 		Conn:        conn,
 		destination: destination,
-	})
+	}
 }
 
 func (m *Method) DialPacketConn(conn net.Conn) N.NetPacketConn {
@@ -459,6 +458,10 @@ func (c *clientConn) ReadFrom(r io.Reader) (n int64, err error) {
 
 func (c *clientConn) NeedHandshake() bool {
 	return c.writer == nil
+}
+
+func (c *clientConn) NeedAdditionalReadDeadline() bool {
+	return true
 }
 
 func (c *clientConn) Upstream() any {

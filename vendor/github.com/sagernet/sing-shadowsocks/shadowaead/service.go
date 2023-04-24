@@ -2,8 +2,6 @@ package shadowaead
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"io"
 	"net"
@@ -14,14 +12,11 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/common/rw"
 	"github.com/sagernet/sing/common/udpnat"
-
-	"golang.org/x/crypto/chacha20poly1305"
 )
 
 var ErrBadHeader = E.New("bad header")
@@ -29,46 +24,21 @@ var ErrBadHeader = E.New("bad header")
 var _ shadowsocks.Service = (*Service)(nil)
 
 type Service struct {
-	name          string
-	keySaltLength int
-	constructor   func(key []byte) (cipher.AEAD, error)
-	key           []byte
-	password      string
-	handler       shadowsocks.Handler
-	udpNat        *udpnat.Service[netip.AddrPort]
+	*Method
+	password string
+	handler  shadowsocks.Handler
+	udpNat   *udpnat.Service[netip.AddrPort]
 }
 
 func NewService(method string, key []byte, password string, udpTimeout int64, handler shadowsocks.Handler) (*Service, error) {
+	m, err := New(method, key, password)
+	if err != nil {
+		return nil, err
+	}
 	s := &Service{
-		name:    method,
+		Method:  m,
 		handler: handler,
 		udpNat:  udpnat.New[netip.AddrPort](udpTimeout, handler),
-	}
-	switch method {
-	case "aes-128-gcm":
-		s.keySaltLength = 16
-		s.constructor = aeadCipher(aes.NewCipher, cipher.NewGCM)
-	case "aes-192-gcm":
-		s.keySaltLength = 24
-		s.constructor = aeadCipher(aes.NewCipher, cipher.NewGCM)
-	case "aes-256-gcm":
-		s.keySaltLength = 32
-		s.constructor = aeadCipher(aes.NewCipher, cipher.NewGCM)
-	case "chacha20-ietf-poly1305":
-		s.keySaltLength = 32
-		s.constructor = chacha20poly1305.New
-	case "xchacha20-ietf-poly1305":
-		s.keySaltLength = 32
-		s.constructor = chacha20poly1305.NewX
-	}
-	if len(key) == s.keySaltLength {
-		s.key = key
-	} else if len(key) > 0 {
-		return nil, shadowsocks.ErrBadKey
-	} else if password != "" {
-		s.key = shadowsocks.Key([]byte(password), s.keySaltLength)
-	} else {
-		return nil, shadowsocks.ErrMissingPassword
 	}
 	return s, nil
 }
@@ -95,7 +65,7 @@ func (s *Service) newConnection(ctx context.Context, conn net.Conn, metadata M.M
 	header := common.Dup(_header)
 	defer header.Release()
 
-	_, err := header.ReadOnceFrom(conn)
+	_, err := header.ReadFullFrom(conn, header.FreeLen())
 	if err != nil {
 		return E.Cause(err, "read header")
 	} else if !header.IsFull() {
@@ -126,11 +96,11 @@ func (s *Service) newConnection(ctx context.Context, conn net.Conn, metadata M.M
 	metadata.Protocol = "shadowsocks"
 	metadata.Destination = destination
 
-	return s.handler.NewConnection(ctx, deadline.NewConn(&serverConn{
-		Service: s,
-		Conn:    conn,
-		reader:  reader,
-	}), metadata)
+	return s.handler.NewConnection(ctx, &serverConn{
+		Method: s.Method,
+		Conn:   conn,
+		reader: reader,
+	}, metadata)
 }
 
 func (s *Service) NewError(ctx context.Context, err error) {
@@ -138,7 +108,7 @@ func (s *Service) NewError(ctx context.Context, err error) {
 }
 
 type serverConn struct {
-	*Service
+	*Method
 	net.Conn
 	access sync.Mutex
 	reader *Reader
@@ -214,15 +184,19 @@ func (c *serverConn) WriteTo(w io.Writer) (n int64, err error) {
 	return c.reader.WriteTo(w)
 }
 
+func (c *serverConn) NeedAdditionalReadDeadline() bool {
+	return true
+}
+
 func (c *serverConn) Upstream() any {
 	return c.Conn
 }
 
-func (s *Service) ReaderMTU() int {
+func (c *serverConn) ReaderMTU() int {
 	return MaxPacketSize
 }
 
-func (s *Service) WriteIsThreadUnsafe() {
+func (c *serverConn) WriteIsThreadUnsafe() {
 }
 
 func (s *Service) NewPacket(ctx context.Context, conn N.PacketConn, buffer *buf.Buffer, metadata M.Metadata) error {
@@ -261,13 +235,13 @@ func (s *Service) newPacket(ctx context.Context, conn N.PacketConn, buffer *buf.
 	metadata.Protocol = "shadowsocks"
 	metadata.Destination = destination
 	s.udpNat.NewPacket(ctx, metadata.Source.AddrPort(), buffer, metadata, func(natConn N.PacketConn) N.PacketWriter {
-		return &serverPacketWriter{s, conn, natConn}
+		return &serverPacketWriter{s.Method, conn, natConn}
 	})
 	return nil
 }
 
 type serverPacketWriter struct {
-	*Service
+	*Method
 	source N.PacketConn
 	nat    N.PacketConn
 }
@@ -308,4 +282,11 @@ func (w *serverPacketWriter) WriterMTU() int {
 
 func (w *serverPacketWriter) Upstream() any {
 	return w.source
+}
+
+func (w *serverPacketWriter) ReaderMTU() int {
+	return MaxPacketSize
+}
+
+func (w *serverPacketWriter) WriteIsThreadUnsafe() {
 }

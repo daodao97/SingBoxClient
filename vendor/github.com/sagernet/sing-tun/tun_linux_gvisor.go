@@ -3,7 +3,8 @@
 package tun
 
 import (
-	"gvisor.dev/gvisor/pkg/tcpip/link/fdbased"
+	"github.com/sagernet/sing-tun/internal/fdbased"
+
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
 

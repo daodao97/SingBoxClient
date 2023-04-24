@@ -12,12 +12,12 @@ import (
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/dialer"
+	"github.com/sagernet/sing-box/common/dialer/conntrack"
 	"github.com/sagernet/sing-box/common/geoip"
 	"github.com/sagernet/sing-box/common/geosite"
 	"github.com/sagernet/sing-box/common/mux"
 	"github.com/sagernet/sing-box/common/process"
 	"github.com/sagernet/sing-box/common/sniff"
-	"github.com/sagernet/sing-box/common/warning"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/experimental/libbox/platform"
 	"github.com/sagernet/sing-box/log"
@@ -31,33 +31,13 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
+	"github.com/sagernet/sing/common/bufio/deadline"
 	"github.com/sagernet/sing/common/control"
 	E "github.com/sagernet/sing/common/exceptions"
 	F "github.com/sagernet/sing/common/format"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/common/uot"
-)
-
-var warnDefaultInterfaceOnUnsupportedPlatform = warning.New(
-	func() bool {
-		return !(C.IsLinux || C.IsWindows || C.IsDarwin)
-	},
-	"route option `default_mark` is only supported on Linux and Windows",
-)
-
-var warnDefaultMarkOnNonLinux = warning.New(
-	func() bool {
-		return !C.IsLinux
-	},
-	"route option `default_mark` is only supported on Linux",
-)
-
-var warnFindProcessOnUnsupportedPlatform = warning.New(
-	func() bool {
-		return !(C.IsLinux || C.IsWindows || C.IsDarwin)
-	},
-	"route option `find_process` is only supported on Linux, Windows, and macOS",
 )
 
 var _ adapter.Router = (*Router)(nil)
@@ -113,16 +93,6 @@ func NewRouter(
 	inbounds []option.Inbound,
 	platformInterface platform.Interface,
 ) (*Router, error) {
-	if options.DefaultInterface != "" {
-		warnDefaultInterfaceOnUnsupportedPlatform.Check()
-	}
-	if options.DefaultMark != 0 {
-		warnDefaultMarkOnNonLinux.Check()
-	}
-	if options.FindProcess {
-		warnFindProcessOnUnsupportedPlatform.Check()
-	}
-
 	router := &Router{
 		ctx:                   ctx,
 		logger:                logFactory.NewLogger("router"),
@@ -289,27 +259,34 @@ func NewRouter(
 		router.fakeIPStore = fakeip.NewStore(router, inet4Range, inet6Range)
 	}
 
-	needInterfaceMonitor := platformInterface == nil && (options.AutoDetectInterface || common.Any(inbounds, func(inbound option.Inbound) bool {
+	usePlatformDefaultInterfaceMonitor := platformInterface != nil && platformInterface.UsePlatformDefaultInterfaceMonitor()
+	needInterfaceMonitor := options.AutoDetectInterface || common.Any(inbounds, func(inbound option.Inbound) bool {
 		return inbound.HTTPOptions.SetSystemProxy || inbound.MixedOptions.SetSystemProxy || inbound.TunOptions.AutoRoute
-	}))
+	})
 
 	if needInterfaceMonitor {
-		networkMonitor, err := tun.NewNetworkUpdateMonitor(router)
-		if err == nil {
-			router.networkMonitor = networkMonitor
-			networkMonitor.RegisterCallback(router.interfaceFinder.update)
+		if !usePlatformDefaultInterfaceMonitor {
+			networkMonitor, err := tun.NewNetworkUpdateMonitor(router)
+			if err != os.ErrInvalid {
+				if err != nil {
+					return nil, err
+				}
+				router.networkMonitor = networkMonitor
+				networkMonitor.RegisterCallback(router.interfaceFinder.update)
+				interfaceMonitor, err := tun.NewDefaultInterfaceMonitor(router.networkMonitor, tun.DefaultInterfaceMonitorOptions{
+					OverrideAndroidVPN: options.OverrideAndroidVPN,
+				})
+				if err != nil {
+					return nil, E.New("auto_detect_interface unsupported on current platform")
+				}
+				interfaceMonitor.RegisterCallback(router.notifyNetworkUpdate)
+				router.interfaceMonitor = interfaceMonitor
+			}
+		} else {
+			interfaceMonitor := platformInterface.CreateDefaultInterfaceMonitor(router)
+			interfaceMonitor.RegisterCallback(router.notifyNetworkUpdate)
+			router.interfaceMonitor = interfaceMonitor
 		}
-	}
-
-	if router.networkMonitor != nil && needInterfaceMonitor {
-		interfaceMonitor, err := tun.NewDefaultInterfaceMonitor(router.networkMonitor, tun.DefaultInterfaceMonitorOptions{
-			OverrideAndroidVPN: options.OverrideAndroidVPN,
-		})
-		if err != nil {
-			return nil, E.New("auto_detect_interface unsupported on current platform")
-		}
-		interfaceMonitor.RegisterCallback(router.notifyNetworkUpdate)
-		router.interfaceMonitor = interfaceMonitor
 	}
 
 	needFindProcess := hasRule(options.Rules, isProcessRule) || hasDNSRule(dnsOptions.Rules, isProcessDNSRule) || options.FindProcess
@@ -436,21 +413,18 @@ func (r *Router) Start() error {
 	if r.needGeoIPDatabase {
 		err := r.prepareGeoIPDatabase()
 		if err != nil {
-			r.logger.Error("prepareGeoIPDatabase", err)
 			return err
 		}
 	}
 	if r.needGeositeDatabase {
 		err := r.prepareGeositeDatabase()
 		if err != nil {
-			r.logger.Error("prepareGeositeDatabase", err)
 			return err
 		}
 	}
 	if r.interfaceMonitor != nil {
 		err := r.interfaceMonitor.Start()
 		if err != nil {
-			r.logger.Error("rule.Start", err)
 			return err
 		}
 	}
@@ -463,7 +437,6 @@ func (r *Router) Start() error {
 	if r.packageManager != nil {
 		err := r.packageManager.Start()
 		if err != nil {
-			r.logger.Error("dnsRules.sStart", err)
 			return err
 		}
 	}
@@ -482,7 +455,6 @@ func (r *Router) Start() error {
 		}
 		err := common.Close(r.geositeReader)
 		if err != nil {
-			r.logger.Error("close geositeReader", err)
 			return err
 		}
 		r.geositeCache = nil
@@ -626,7 +598,8 @@ func (r *Router) RouteConnection(ctx context.Context, conn net.Conn, metadata ad
 	switch metadata.Destination.Fqdn {
 	case mux.Destination.Fqdn:
 		r.logger.InfoContext(ctx, "inbound multiplex connection")
-		return mux.NewConnection(ctx, r, r, r.logger, conn, metadata)
+		handler := adapter.NewUpstreamHandler(metadata, r.RouteConnection, r.RoutePacketConnection, r)
+		return mux.HandleConnection(ctx, handler, r.logger, conn, adapter.UpstreamMetadata(metadata))
 	case vmess.MuxDestination.Fqdn:
 		r.logger.InfoContext(ctx, "inbound legacy multiplex connection")
 		return vmess.HandleMuxConnection(ctx, conn, adapter.NewUpstreamHandler(metadata, r.RouteConnection, r.RoutePacketConnection, r))
@@ -660,6 +633,10 @@ func (r *Router) RouteConnection(ctx context.Context, conn net.Conn, metadata ad
 			Port: metadata.Destination.Port,
 		}
 		r.logger.DebugContext(ctx, "found fakeip domain: ", domain)
+	}
+
+	if deadline.NeedAdditionalReadDeadline(conn) {
+		conn = deadline.NewConn(conn)
 	}
 
 	if metadata.InboundOptions.SniffEnabled {
@@ -766,6 +743,11 @@ func (r *Router) RoutePacketConnection(ctx context.Context, conn N.PacketConn, m
 		}
 		r.logger.DebugContext(ctx, "found fakeip domain: ", domain)
 	}
+
+	// Currently we don't have deadline usages for UDP connections
+	/*if deadline.NeedAdditionalReadDeadline(conn) {
+		conn = deadline.NewPacketConn(bufio.NewNetPacketConn(conn))
+	}*/
 
 	if metadata.InboundOptions.SniffEnabled {
 		buffer := buf.NewPacket()
@@ -891,12 +873,31 @@ func (r *Router) InterfaceFinder() control.InterfaceFinder {
 	return &r.interfaceFinder
 }
 
+func (r *Router) UpdateInterfaces() error {
+	if r.platformInterface == nil || !r.platformInterface.UsePlatformInterfaceGetter() {
+		return r.interfaceFinder.update()
+	} else {
+		interfaces, err := r.platformInterface.Interfaces()
+		if err != nil {
+			return err
+		}
+		r.interfaceFinder.updateInterfaces(common.Map(interfaces, func(it platform.NetworkInterface) net.Interface {
+			return net.Interface{
+				Name:  it.Name,
+				Index: it.Index,
+				MTU:   it.MTU,
+			}
+		}))
+		return nil
+	}
+}
+
 func (r *Router) AutoDetectInterface() bool {
 	return r.autoDetectInterface
 }
 
 func (r *Router) AutoDetectInterfaceFunc() control.Func {
-	if r.platformInterface != nil {
+	if r.platformInterface != nil && r.platformInterface.UsePlatformAutoDetectInterfaceControl() {
 		return r.platformInterface.AutoDetectInterfaceControl()
 	} else {
 		return control.BindToInterfaceFunc(r.InterfaceFinder(), func(network string, address string) (interfaceName string, interfaceIndex int) {
@@ -975,7 +976,7 @@ func (r *Router) NewError(ctx context.Context, err error) {
 }
 
 func (r *Router) notifyNetworkUpdate(int) error {
-	if C.IsAndroid {
+	if C.IsAndroid && r.platformInterface == nil {
 		var vpnStatus string
 		if r.interfaceMonitor.AndroidVPNEnabled() {
 			vpnStatus = "enabled"
@@ -986,6 +987,23 @@ func (r *Router) notifyNetworkUpdate(int) error {
 	} else {
 		r.logger.Info("updated default interface ", r.interfaceMonitor.DefaultInterfaceName(netip.IPv4Unspecified()), ", index ", r.interfaceMonitor.DefaultInterfaceIndex(netip.IPv4Unspecified()))
 	}
+
+	conntrack.Close()
+
+	for _, outbound := range r.outbounds {
+		listener, isListener := outbound.(adapter.InterfaceUpdateListener)
+		if isListener {
+			err := listener.InterfaceUpdated()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r *Router) ResetNetwork() error {
+	conntrack.Close()
 
 	for _, outbound := range r.outbounds {
 		listener, isListener := outbound.(adapter.InterfaceUpdateListener)

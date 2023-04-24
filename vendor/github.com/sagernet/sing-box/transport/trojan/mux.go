@@ -4,8 +4,6 @@ import (
 	"context"
 	"net"
 
-	"github.com/sagernet/sing/common/bufio"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	"github.com/sagernet/sing/common/rw"
@@ -55,7 +53,7 @@ func newMuxConnection0(ctx context.Context, stream net.Conn, metadata M.Metadata
 	case CommandTCP:
 		return handler.NewConnection(ctx, stream, metadata)
 	case CommandUDP:
-		return handler.NewPacketConnection(ctx, deadline.NewPacketConn(bufio.NewNetPacketConn(&PacketConn{stream})), metadata)
+		return handler.NewPacketConnection(ctx, &PacketConn{stream}, metadata)
 	default:
 		return E.New("unknown command ", command)
 	}

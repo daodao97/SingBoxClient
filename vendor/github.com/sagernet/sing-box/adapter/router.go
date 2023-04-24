@@ -37,6 +37,7 @@ type Router interface {
 	LookupDefault(ctx context.Context, domain string) ([]netip.Addr, error)
 
 	InterfaceFinder() control.InterfaceFinder
+	UpdateInterfaces() error
 	DefaultInterface() string
 	AutoDetectInterface() bool
 	AutoDetectInterfaceFunc() control.Func
@@ -55,6 +56,8 @@ type Router interface {
 
 	V2RayServer() V2RayServer
 	SetV2RayServer(server V2RayServer)
+
+	ResetNetwork() error
 }
 
 type routerContextKey struct{}

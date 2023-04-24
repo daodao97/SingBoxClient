@@ -172,6 +172,10 @@ func (c *XUDPConn) NeedHandshake() bool {
 	return !c.requestWritten
 }
 
+func (c *XUDPConn) NeedAdditionalReadDeadline() bool {
+	return true
+}
+
 func (c *XUDPConn) Upstream() any {
 	return c.Conn
 }

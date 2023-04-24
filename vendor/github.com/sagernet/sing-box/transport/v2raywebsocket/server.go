@@ -16,7 +16,6 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -108,7 +107,7 @@ func (s *Server) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if len(earlyData) > 0 {
 		conn = bufio.NewCachedConn(conn, buf.As(earlyData))
 	}
-	s.handler.NewConnection(request.Context(), deadline.NewConn(conn), metadata)
+	s.handler.NewConnection(request.Context(), conn, metadata)
 }
 
 func (s *Server) fallbackRequest(ctx context.Context, writer http.ResponseWriter, request *http.Request, statusCode int, err error) {

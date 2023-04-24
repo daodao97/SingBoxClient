@@ -12,7 +12,7 @@ import (
 )
 
 func NewVectorisedWriter(writer io.Writer) N.VectorisedWriter {
-	if vectorisedWriter, ok := CreateVectorisedWriter(writer); ok {
+	if vectorisedWriter, ok := CreateVectorisedWriter(N.UnwrapWriter(writer)); ok {
 		return vectorisedWriter
 	}
 	return &BufferedVectorisedWriter{upstream: writer}

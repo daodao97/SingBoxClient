@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/netip"
 
+	"github.com/sagernet/sing/common/control"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
 )
@@ -25,7 +26,8 @@ type StackOptions struct {
 	Router                 Router
 	Handler                Handler
 	Logger                 logger.Logger
-	UnderPlatform          bool
+	ForwarderBindInterface bool
+	InterfaceFinder        control.InterfaceFinder
 }
 
 func NewStack(
@@ -34,7 +36,7 @@ func NewStack(
 ) (Stack, error) {
 	switch stack {
 	case "":
-		return defaultStack(options)
+		return NewSystem(options)
 	case "gvisor":
 		return NewGVisor(options)
 	case "system":

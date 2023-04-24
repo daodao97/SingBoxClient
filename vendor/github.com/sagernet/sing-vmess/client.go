@@ -16,7 +16,6 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -72,11 +71,11 @@ func NewClient(userId string, security string, alterId int, options ...ClientOpt
 
 func (c *Client) DialConn(upstream net.Conn, destination M.Socksaddr) (N.ExtendedConn, error) {
 	conn := &clientConn{c.dialRaw(upstream, CommandTCP, destination)}
-	return deadline.NewConn(conn), conn.writeHandshake(nil)
+	return conn, conn.writeHandshake(nil)
 }
 
 func (c *Client) DialEarlyConn(upstream net.Conn, destination M.Socksaddr) N.ExtendedConn {
-	return deadline.NewConn(&clientConn{c.dialRaw(upstream, CommandTCP, destination)})
+	return &clientConn{c.dialRaw(upstream, CommandTCP, destination)}
 }
 
 type PacketConn interface {
@@ -90,7 +89,7 @@ func (c *Client) DialPacketConn(upstream net.Conn, destination M.Socksaddr) (Pac
 }
 
 func (c *Client) DialEarlyPacketConn(upstream net.Conn, destination M.Socksaddr) PacketConn {
-	return bufio.NewBindPacketConn(deadline.NewPacketConn(&clientPacketConn{clientConn{c.dialRaw(upstream, CommandUDP, destination)}, destination}), destination)
+	return &clientPacketConn{clientConn{c.dialRaw(upstream, CommandUDP, destination)}, destination}
 }
 
 func (c *Client) DialXUDPPacketConn(upstream net.Conn, destination M.Socksaddr) (PacketConn, error) {
@@ -99,11 +98,11 @@ func (c *Client) DialXUDPPacketConn(upstream net.Conn, destination M.Socksaddr) 
 	if err != nil {
 		return nil, err
 	}
-	return bufio.NewBindPacketConn(deadline.NewPacketConn(NewXUDPConn(conn, destination)), destination), nil
+	return NewXUDPConn(conn, destination), nil
 }
 
 func (c *Client) DialEarlyXUDPPacketConn(upstream net.Conn, destination M.Socksaddr) PacketConn {
-	return bufio.NewBindPacketConn(deadline.NewPacketConn(NewXUDPConn(&clientConn{c.dialRaw(upstream, CommandMux, destination)}, destination)), destination)
+	return NewXUDPConn(&clientConn{c.dialRaw(upstream, CommandMux, destination)}, destination)
 }
 
 type rawClientConn struct {
@@ -417,6 +416,10 @@ func (c *rawClientConn) FrontHeadroom() int {
 
 func (c *rawClientConn) RearHeadroom() int {
 	return MaxRearHeadroom
+}
+
+func (c *rawClientConn) NeedAdditionalReadDeadline() bool {
+	return true
 }
 
 func (c *rawClientConn) Upstream() any {

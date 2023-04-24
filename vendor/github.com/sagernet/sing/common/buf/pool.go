@@ -1,6 +1,9 @@
 package buf
 
 func Get(size int) []byte {
+	if size == 0 {
+		return nil
+	}
 	return DefaultAllocator.Get(size)
 }
 
@@ -9,6 +12,9 @@ func Put(buf []byte) error {
 }
 
 func Make(size int) []byte {
+	if size == 0 {
+		return nil
+	}
 	var buffer []byte
 	switch {
 	case size <= 2:

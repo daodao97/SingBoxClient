@@ -10,7 +10,6 @@ import (
 
 	"github.com/pkg/errors"
 	box "github.com/sagernet/sing-box"
-	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/option"
 )
 
@@ -38,8 +37,6 @@ func (s *SingBox) Start(basePath, configPath string) error {
 		}
 	}()
 
-	C.SetBasePath(basePath)
-
 	instance, cancel, err := create(filepath.Join(basePath, configPath))
 	if err != nil {
 		return err
@@ -60,20 +57,7 @@ func create(configPath string) (*box.Box, context.CancelFunc, error) {
 	}
 	options.Experimental.ClashAPI.ExternalUI = filepath.Join(ConfDir, "ui")
 	options.Log.DisableColor = true
-	options.Log.Output = filepath.Join(ConfDir, "singbox.log")
-
-	if options.Route.Geosite == nil {
-		options.Route.Geosite = &option.GeositeOptions{}
-	}
-	if options.Route.Geosite.Path == "" {
-		options.Route.Geosite.Path = filepath.Join(ConfDir, "geosite.db")
-	}
-	if options.Route.GeoIP == nil {
-		options.Route.GeoIP = &option.GeoIPOptions{}
-	}
-	if options.Route.GeoIP.Path == "" {
-		options.Route.GeoIP.Path = filepath.Join(ConfDir, "geoip.db")
-	}
+	//options.Log.Output = filepath.Join(ConfDir, "singbox.log")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	instance, err := box.New(box.Options{

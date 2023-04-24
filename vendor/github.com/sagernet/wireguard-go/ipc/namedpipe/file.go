@@ -4,7 +4,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build windows
-// +build windows
 
 package namedpipe
 
@@ -16,7 +15,8 @@ import (
 	"time"
 	"unsafe"
 
-	"go.uber.org/atomic"
+	"github.com/sagernet/sing/common/atomic"
+
 	"golang.org/x/sys/windows"
 )
 

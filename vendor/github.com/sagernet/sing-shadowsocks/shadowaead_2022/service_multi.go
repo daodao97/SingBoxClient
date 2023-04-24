@@ -17,7 +17,6 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/auth"
 	"github.com/sagernet/sing/common/buf"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -25,6 +24,8 @@ import (
 
 	"lukechampine.com/blake3"
 )
+
+var _ shadowsocks.MultiService[int] = (*MultiService[int])(nil)
 
 type MultiService[U comparable] struct {
 	*Service
@@ -241,7 +242,7 @@ func (s *MultiService[U]) newConnection(ctx context.Context, conn net.Conn, meta
 	protocolConn.reader = reader
 	metadata.Protocol = "shadowsocks"
 	metadata.Destination = destination
-	return s.handler.NewConnection(auth.ContextWithUser(ctx, user), deadline.NewConn(protocolConn), metadata)
+	return s.handler.NewConnection(auth.ContextWithUser(ctx, user), protocolConn, metadata)
 }
 
 func (s *MultiService[U]) WriteIsThreadUnsafe() {

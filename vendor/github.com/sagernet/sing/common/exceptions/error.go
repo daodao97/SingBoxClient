@@ -25,10 +25,16 @@ func New(message ...any) error {
 }
 
 func Cause(cause error, message ...any) error {
+	if cause == nil {
+		return nil
+	}
 	return &causeError{F.ToString(message...), cause}
 }
 
 func Extend(cause error, message ...any) error {
+	if cause == nil {
+		return nil
+	}
 	return &extendedError{F.ToString(message...), cause}
 }
 

@@ -68,7 +68,7 @@ func (h Outbound) MarshalJSON() ([]byte, error) {
 	case C.TypeProvider:
 		v = h.ProviderOptions
 	default:
-		return nil, E.New("unknown outbound type1: ", h.Type)
+		return nil, E.New("unknown outbound type: ", h.Type)
 	}
 	return MarshallObjects((_Outbound)(h), v)
 }
@@ -115,7 +115,7 @@ func (h *Outbound) UnmarshalJSON(bytes []byte) error {
 	case C.TypeProvider:
 		v = &h.ProviderOptions
 	default:
-		return E.New("unknown outbound type2: ", h.Type)
+		return E.New("unknown outbound type: ", h.Type)
 	}
 	err = UnmarshallExcluded(bytes, (*_Outbound)(h), v)
 	if err != nil {
@@ -155,4 +155,5 @@ type MultiplexOptions struct {
 	MaxConnections int    `json:"max_connections,omitempty"`
 	MinStreams     int    `json:"min_streams,omitempty"`
 	MaxStreams     int    `json:"max_streams,omitempty"`
+	Padding        bool   `json:"padding,omitempty"`
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/tls"
 	"github.com/sagernet/sing-box/option"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -79,11 +78,11 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 	if c.maxEarlyData <= 0 {
 		conn, response, err := c.dialer.DialContext(ctx, c.uri, c.headers)
 		if err == nil {
-			return deadline.NewConn(&WebsocketConn{Conn: conn, Writer: NewWriter(conn, false)}), nil
+			return &WebsocketConn{Conn: conn, Writer: NewWriter(conn, false)}, nil
 		}
 		return nil, wrapDialError(response, err)
 	} else {
-		return deadline.NewConn(&EarlyWebsocketConn{Client: c, ctx: ctx, create: make(chan struct{})}), nil
+		return &EarlyWebsocketConn{Client: c, ctx: ctx, create: make(chan struct{})}, nil
 	}
 }
 

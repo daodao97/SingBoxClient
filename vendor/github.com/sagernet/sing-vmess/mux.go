@@ -14,7 +14,6 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -139,20 +138,20 @@ func (c *serverSession) recv() error {
 		go func() {
 			var hErr error
 			if network == NetworkTCP {
-				hErr = c.handler.NewConnection(c.ctx, deadline.NewConn(&serverMuxConn{
+				hErr = c.handler.NewConnection(c.ctx, &serverMuxConn{
 					sessionID,
 					pipeIn,
 					c,
-				}), M.Metadata{
+				}, M.Metadata{
 					Destination: destination,
 				})
 			} else {
-				hErr = c.handler.NewPacketConnection(c.ctx, deadline.NewPacketConn(&serverMuxPacketConn{
+				hErr = c.handler.NewPacketConnection(c.ctx, &serverMuxPacketConn{
 					sessionID,
 					pipeIn,
 					c,
 					destination,
-				}), M.Metadata{
+				}, M.Metadata{
 					Destination: destination,
 				})
 			}
@@ -445,6 +444,10 @@ func (c *serverMuxConn) SetWriteDeadline(t time.Time) error {
 	return os.ErrInvalid
 }
 
+func (c *serverMuxConn) NeedAdditionalReadDeadline() bool {
+	return true
+}
+
 var _ PacketConn = (*serverMuxPacketConn)(nil)
 
 type serverMuxPacketConn struct {
@@ -544,4 +547,8 @@ func (c *serverMuxPacketConn) SetReadDeadline(t time.Time) error {
 
 func (c *serverMuxPacketConn) SetWriteDeadline(t time.Time) error {
 	return os.ErrInvalid
+}
+
+func (c *serverMuxPacketConn) NeedAdditionalReadDeadline() bool {
+	return true
 }

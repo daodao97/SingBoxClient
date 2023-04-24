@@ -139,6 +139,10 @@ func (c *Conn) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
 	return c.writer.WriteVectorised([]*buf.Buffer{header, buffer})
 }
 
+func (c *Conn) NeedAdditionalReadDeadline() bool {
+	return true
+}
+
 func (c *Conn) Upstream() any {
 	return c.Conn
 }

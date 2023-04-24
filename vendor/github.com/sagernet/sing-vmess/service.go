@@ -20,7 +20,6 @@ import (
 	"github.com/sagernet/sing/common/auth"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -350,9 +349,9 @@ func (s *Service[U]) NewConnection(ctx context.Context, conn net.Conn, metadata 
 
 	switch command {
 	case CommandTCP:
-		return s.handler.NewConnection(ctx, deadline.NewConn(&serverConn{rawConn}), metadata)
+		return s.handler.NewConnection(ctx, &serverConn{rawConn}, metadata)
 	case CommandUDP:
-		return s.handler.NewPacketConnection(ctx, deadline.NewPacketConn(&serverPacketConn{rawConn, metadata.Destination}), metadata)
+		return s.handler.NewPacketConnection(ctx, &serverPacketConn{rawConn, metadata.Destination}, metadata)
 	case CommandMux:
 		return HandleMuxConnection(ctx, &serverConn{rawConn}, s.handler)
 	default:
@@ -437,12 +436,16 @@ func (c *rawServerConn) RearHeadroom() int {
 	return MaxRearHeadroom
 }
 
-func (c *rawServerConn) Upstream() any {
-	return c.Conn
-}
-
 func (c *rawServerConn) NeedHandshake() bool {
 	return c.writer == nil
+}
+
+func (c *rawServerConn) NeedAdditionalReadDeadline() bool {
+	return true
+}
+
+func (c *rawServerConn) Upstream() any {
+	return c.Conn
 }
 
 type serverConn struct {

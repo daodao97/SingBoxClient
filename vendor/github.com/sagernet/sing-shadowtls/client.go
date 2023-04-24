@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 
-	"github.com/sagernet/sing/common/bufio/deadline"
 	"github.com/sagernet/sing/common/debug"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
@@ -96,7 +95,7 @@ func (c *Client) DialContextConn(ctx context.Context, conn net.Conn) (net.Conn, 
 			return nil, err
 		}
 		c.logger.TraceContext(ctx, "clint handshake finished")
-		return deadline.NewConn(newClientConn(hashConn)), nil
+		return newClientConn(hashConn), nil
 	case 3:
 		stream := newStreamWrapper(conn, c.password)
 		err := c.tlsHandshake(ctx, stream, generateSessionID(c.password))
@@ -117,6 +116,6 @@ func (c *Client) DialContextConn(ctx context.Context, conn net.Conn) (net.Conn, 
 		hmacVerify := hmac.New(sha1.New, []byte(c.password))
 		hmacVerify.Write(serverRandom)
 		hmacVerify.Write([]byte("S"))
-		return deadline.NewConn(newVerifiedConn(conn, hmacAdd, hmacVerify, readHMAC)), nil
+		return newVerifiedConn(conn, hmacAdd, hmacVerify, readHMAC), nil
 	}
 }

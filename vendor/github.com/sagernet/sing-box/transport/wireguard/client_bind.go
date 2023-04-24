@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/sagernet/sing/common"
-	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
+	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/wireguard-go/conn"
@@ -18,6 +18,7 @@ var _ conn.Bind = (*ClientBind)(nil)
 
 type ClientBind struct {
 	ctx                 context.Context
+	errorHandler        E.Handler
 	dialer              N.Dialer
 	reservedForEndpoint map[M.Socksaddr][3]uint8
 	connAccess          sync.Mutex
@@ -28,9 +29,10 @@ type ClientBind struct {
 	reserved            [3]uint8
 }
 
-func NewClientBind(ctx context.Context, dialer N.Dialer, isConnect bool, connectAddr M.Socksaddr, reserved [3]uint8) *ClientBind {
+func NewClientBind(ctx context.Context, errorHandler E.Handler, dialer N.Dialer, isConnect bool, connectAddr M.Socksaddr, reserved [3]uint8) *ClientBind {
 	return &ClientBind{
 		ctx:                 ctx,
+		errorHandler:        errorHandler,
 		dialer:              dialer,
 		reservedForEndpoint: make(map[M.Socksaddr][3]uint8),
 		isConnect:           isConnect,
@@ -67,10 +69,10 @@ func (c *ClientBind) connect() (*wireConn, error) {
 	if c.isConnect {
 		udpConn, err := c.dialer.DialContext(c.ctx, N.NetworkUDP, c.connectAddr)
 		if err != nil {
-			return nil, &wireError{err}
+			return nil, err
 		}
 		c.conn = &wireConn{
-			NetPacketConn: &bufio.UnbindPacketConn{
+			PacketConn: &bufio.UnbindPacketConn{
 				ExtendedConn: bufio.NewExtendedConn(udpConn),
 				Addr:         c.connectAddr,
 			},
@@ -79,11 +81,11 @@ func (c *ClientBind) connect() (*wireConn, error) {
 	} else {
 		udpConn, err := c.dialer.ListenPacket(c.ctx, M.Socksaddr{Addr: netip.IPv4Unspecified()})
 		if err != nil {
-			return nil, &wireError{err}
+			return nil, err
 		}
 		c.conn = &wireConn{
-			NetPacketConn: bufio.NewPacketConn(udpConn),
-			done:          make(chan struct{}),
+			PacketConn: bufio.NewPacketConn(udpConn),
+			done:       make(chan struct{}),
 		}
 	}
 	return c.conn, nil
@@ -99,33 +101,38 @@ func (c *ClientBind) Open(port uint16) (fns []conn.ReceiveFunc, actualPort uint1
 	return []conn.ReceiveFunc{c.receive}, 0, nil
 }
 
-func (c *ClientBind) receive(b []byte) (n int, ep conn.Endpoint, err error) {
+func (c *ClientBind) receive(packets [][]byte, sizes []int, eps []conn.Endpoint) (count int, err error) {
 	udpConn, err := c.connect()
 	if err != nil {
-		err = &wireError{err}
+		select {
+		case <-c.done:
+			return
+		default:
+		}
+		c.errorHandler.NewError(context.Background(), E.Cause(err, "connect to server"))
+		err = nil
 		return
 	}
-	buffer := buf.With(b)
-	destination, err := udpConn.ReadPacket(buffer)
+	n, addr, err := udpConn.ReadFrom(packets[0])
 	if err != nil {
 		udpConn.Close()
 		select {
 		case <-c.done:
 		default:
-			err = &wireError{err}
+			c.errorHandler.NewError(context.Background(), E.Cause(err, "read packet"))
+			err = nil
 		}
 		return
 	}
-	n = buffer.Len()
-	if buffer.Start() > 0 {
-		copy(b, buffer.Bytes())
-	}
+	sizes[0] = n
 	if n > 3 {
+		b := packets[0]
 		b[1] = 0
 		b[2] = 0
 		b[3] = 0
 	}
-	ep = Endpoint(destination)
+	eps[0] = Endpoint(M.SocksaddrFromNet(addr))
+	count = 1
 	return
 }
 
@@ -152,34 +159,41 @@ func (c *ClientBind) SetMark(mark uint32) error {
 	return nil
 }
 
-func (c *ClientBind) Send(b []byte, ep conn.Endpoint) error {
+func (c *ClientBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 	udpConn, err := c.connect()
 	if err != nil {
 		return err
 	}
 	destination := M.Socksaddr(ep.(Endpoint))
-	if len(b) > 3 {
-		reserved, loaded := c.reservedForEndpoint[destination]
-		if !loaded {
-			reserved = c.reserved
+	for _, b := range bufs {
+		if len(b) > 3 {
+			reserved, loaded := c.reservedForEndpoint[destination]
+			if !loaded {
+				reserved = c.reserved
+			}
+			b[1] = reserved[0]
+			b[2] = reserved[1]
+			b[3] = reserved[2]
 		}
-		b[1] = reserved[0]
-		b[2] = reserved[1]
-		b[3] = reserved[2]
+		_, err = udpConn.WriteTo(b, destination)
+		if err != nil {
+			udpConn.Close()
+			return err
+		}
 	}
-	err = udpConn.WritePacket(buf.As(b), destination)
-	if err != nil {
-		udpConn.Close()
-	}
-	return err
+	return nil
 }
 
 func (c *ClientBind) ParseEndpoint(s string) (conn.Endpoint, error) {
 	return Endpoint(M.ParseSocksaddr(s)), nil
 }
 
+func (c *ClientBind) BatchSize() int {
+	return 1
+}
+
 type wireConn struct {
-	N.NetPacketConn
+	net.PacketConn
 	access sync.Mutex
 	done   chan struct{}
 }
@@ -192,7 +206,7 @@ func (w *wireConn) Close() error {
 		return net.ErrClosed
 	default:
 	}
-	w.NetPacketConn.Close()
+	w.PacketConn.Close()
 	close(w.done)
 	return nil
 }

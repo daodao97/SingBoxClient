@@ -62,6 +62,7 @@ func New(options Options) (*Box, error) {
 		defaultLogWriter = io.Discard
 	}
 	logFactory, err := log.New(log.Options{
+		Context:        ctx,
 		Options:        common.PtrValueOrDefault(options.Log),
 		Observable:     needClashAPI,
 		DefaultWriter:  defaultLogWriter,
@@ -133,10 +134,16 @@ func New(options Options) (*Box, error) {
 	if err != nil {
 		return nil, err
 	}
+	if options.PlatformInterface != nil {
+		err = options.PlatformInterface.Initialize(ctx, router)
+		if err != nil {
+			return nil, E.Cause(err, "initialize platform interface")
+		}
+	}
 	preServices := make(map[string]adapter.Service)
 	postServices := make(map[string]adapter.Service)
 	if needClashAPI {
-		clashServer, err := experimental.NewClashServer(router, logFactory.(log.ObservableFactory), common.PtrValueOrDefault(options.Experimental.ClashAPI))
+		clashServer, err := experimental.NewClashServer(ctx, router, logFactory.(log.ObservableFactory), common.PtrValueOrDefault(options.Experimental.ClashAPI))
 		if err != nil {
 			return nil, E.Cause(err, "create clash api server")
 		}

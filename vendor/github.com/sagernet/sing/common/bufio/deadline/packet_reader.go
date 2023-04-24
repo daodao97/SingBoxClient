@@ -3,123 +3,173 @@ package deadline
 import (
 	"net"
 	"os"
-	"sync"
 	"time"
 
+	"github.com/sagernet/sing/common/atomic"
 	"github.com/sagernet/sing/common/buf"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 )
 
-type PacketReader struct {
+type TimeoutPacketReader interface {
 	N.NetPacketReader
-	deadline     time.Time
+	SetReadDeadline(t time.Time) error
+}
+
+type PacketReader interface {
+	TimeoutPacketReader
+	N.WithUpstreamReader
+	N.ReaderWithUpstream
+}
+
+type packetReader struct {
+	TimeoutPacketReader
+	deadline     atomic.TypedValue[time.Time]
 	pipeDeadline pipeDeadline
-	cacheAccess  sync.RWMutex
-	cached       bool
-	cachedBuffer *buf.Buffer
-	cachedAddr   M.Socksaddr
-	cachedErr    error
+	result       chan *packetReadResult
+	done         chan struct{}
 }
 
-func NewPacketReader(reader N.NetPacketReader) *PacketReader {
-	return &PacketReader{NetPacketReader: reader, pipeDeadline: makePipeDeadline()}
+type packetReadResult struct {
+	buffer      *buf.Buffer
+	destination M.Socksaddr
+	err         error
 }
 
-func (r *PacketReader) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	r.cacheAccess.Lock()
-	if r.cached {
-		n = copy(p, r.cachedBuffer.Bytes())
-		addr = r.cachedAddr.UDPAddr()
-		err = r.cachedErr
-		r.cachedBuffer.Release()
-		r.cached = false
-		r.cacheAccess.Unlock()
-		return
+func NewPacketReader(timeoutReader TimeoutPacketReader) PacketReader {
+	return &packetReader{
+		TimeoutPacketReader: timeoutReader,
+		pipeDeadline:        makePipeDeadline(),
+		result:              make(chan *packetReadResult, 1),
+		done:                makeFilledChan(),
 	}
-	r.cacheAccess.Unlock()
-	done := make(chan struct{})
-	go func() {
-		n, addr, err = r.pipeReadFrom(p, r.pipeDeadline.wait())
-		close(done)
-	}()
+}
+
+func (r *packetReader) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	select {
-	case <-done:
-		return
+	case result := <-r.result:
+		return r.pipeReturnFrom(result, p)
+	default:
+	}
+	select {
+	case <-r.done:
+		go r.pipeReadFrom(len(p))
+	default:
+	}
+	return r.readFrom(p)
+}
+
+func (r *packetReader) readFrom(p []byte) (n int, addr net.Addr, err error) {
+	select {
+	case result := <-r.result:
+		return r.pipeReturnFrom(result, p)
 	case <-r.pipeDeadline.wait():
 		return 0, nil, os.ErrDeadlineExceeded
 	}
 }
 
-func (r *PacketReader) pipeReadFrom(p []byte, cancel chan struct{}) (n int, addr net.Addr, err error) {
-	r.cacheAccess.Lock()
-	defer r.cacheAccess.Unlock()
-	cacheBuffer := buf.NewSize(len(p))
-	n, addr, err = r.NetPacketReader.ReadFrom(cacheBuffer.Bytes())
-	if isClosedChan(cancel) {
-		r.cached = true
-		r.cachedBuffer = cacheBuffer
-		r.cachedAddr = M.SocksaddrFromNet(addr)
-		r.cachedErr = err
+func (r *packetReader) pipeReadFrom(pLen int) {
+	buffer := buf.NewSize(pLen)
+	n, addr, err := r.TimeoutPacketReader.ReadFrom(buffer.FreeBytes())
+	buffer.Truncate(n)
+	r.result <- &packetReadResult{
+		buffer:      buffer,
+		destination: M.SocksaddrFromNet(addr),
+		err:         err,
+	}
+	r.done <- struct{}{}
+}
+
+func (r *packetReader) pipeReturnFrom(result *packetReadResult, p []byte) (n int, addr net.Addr, err error) {
+	n = copy(p, result.buffer.Bytes())
+	if result.destination.IsValid() {
+		if result.destination.IsFqdn() {
+			addr = result.destination
+		} else {
+			addr = result.destination.UDPAddr()
+		}
+	}
+	result.buffer.Advance(n)
+	if result.buffer.IsEmpty() {
+		result.buffer.Release()
+		err = result.err
 	} else {
-		copy(p, cacheBuffer.Bytes())
-		cacheBuffer.Release()
+		r.result <- result
 	}
 	return
 }
 
-func (r *PacketReader) ReadPacket(buffer *buf.Buffer) (destination M.Socksaddr, err error) {
-	r.cacheAccess.Lock()
-	if r.cached {
-		destination = r.cachedAddr
-		err = r.cachedErr
-		buffer.Write(r.cachedBuffer.Bytes())
-		r.cachedBuffer.Release()
-		r.cached = false
-		r.cacheAccess.Unlock()
-		return
-	}
-	r.cacheAccess.Unlock()
-	done := make(chan struct{})
-	go func() {
-		destination, err = r.pipeReadPacket(buffer, r.pipeDeadline.wait())
-		close(done)
-	}()
+func (r *packetReader) ReadPacket(buffer *buf.Buffer) (destination M.Socksaddr, err error) {
 	select {
-	case <-done:
-		return
+	case result := <-r.result:
+		return r.pipeReturnFromBuffer(result, buffer)
+	default:
+	}
+	select {
+	case <-r.done:
+		go r.pipeReadFromBuffer(buffer.Cap(), buffer.Start())
+	default:
+	}
+	return r.readPacket(buffer)
+}
+
+func (r *packetReader) readPacket(buffer *buf.Buffer) (destination M.Socksaddr, err error) {
+	select {
+	case result := <-r.result:
+		return r.pipeReturnFromBuffer(result, buffer)
 	case <-r.pipeDeadline.wait():
 		return M.Socksaddr{}, os.ErrDeadlineExceeded
 	}
 }
 
-func (r *PacketReader) pipeReadPacket(buffer *buf.Buffer, cancel chan struct{}) (destination M.Socksaddr, err error) {
-	r.cacheAccess.Lock()
-	defer r.cacheAccess.Unlock()
-	cacheBuffer := buf.NewSize(buffer.FreeLen())
-	destination, err = r.NetPacketReader.ReadPacket(cacheBuffer)
-	if isClosedChan(cancel) {
-		r.cached = true
-		r.cachedBuffer = cacheBuffer
-		r.cachedAddr = destination
-		r.cachedErr = err
+func (r *packetReader) pipeReturnFromBuffer(result *packetReadResult, buffer *buf.Buffer) (M.Socksaddr, error) {
+	buffer.Resize(result.buffer.Start(), 0)
+	n := copy(buffer.FreeBytes(), result.buffer.Bytes())
+	buffer.Truncate(n)
+	result.buffer.Advance(n)
+	if !result.buffer.IsEmpty() {
+		r.result <- result
+		return result.destination, nil
 	} else {
-		buffer.ReadOnceFrom(cacheBuffer)
-		cacheBuffer.Release()
+		result.buffer.Release()
+		return result.destination, result.err
 	}
-	return
 }
 
-func (r *PacketReader) SetReadDeadline(t time.Time) error {
-	r.deadline = t
+func (r *packetReader) pipeReadFromBuffer(bufLen int, bufStart int) {
+	buffer := buf.NewSize(bufLen)
+	buffer.Advance(bufStart)
+	destination, err := r.TimeoutPacketReader.ReadPacket(buffer)
+	r.result <- &packetReadResult{
+		buffer:      buffer,
+		destination: destination,
+		err:         err,
+	}
+	r.done <- struct{}{}
+}
+
+func (r *packetReader) SetReadDeadline(t time.Time) error {
+	r.deadline.Store(t)
 	r.pipeDeadline.set(t)
 	return nil
 }
 
-func (r *PacketReader) ReaderReplaceable() bool {
-	return r.deadline.IsZero()
+func (r *packetReader) ReaderReplaceable() bool {
+	select {
+	case <-r.done:
+		r.done <- struct{}{}
+	default:
+		return false
+	}
+	select {
+	case result := <-r.result:
+		r.result <- result
+		return false
+	default:
+	}
+	return r.deadline.Load().IsZero()
 }
 
-func (r *PacketReader) UpstreamReader() any {
-	return r.NetPacketReader
+func (r *packetReader) UpstreamReader() any {
+	return r.TimeoutPacketReader
 }

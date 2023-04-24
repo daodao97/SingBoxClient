@@ -109,7 +109,7 @@ func (e *DarwinEndpoint) ARPHardwareType() header.ARPHardwareType {
 	return header.ARPHardwareNone
 }
 
-func (e *DarwinEndpoint) AddHeader(buffer *stack.PacketBuffer) {
+func (e *DarwinEndpoint) AddHeader(buffer stack.PacketBufferPtr) {
 }
 
 func (e *DarwinEndpoint) WritePackets(packetBufferList stack.PacketBufferList) (int, tcpip.Error) {

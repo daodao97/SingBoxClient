@@ -152,6 +152,7 @@ func (t *Transport) exchange(ctx context.Context, message *mDNS.Msg, conn quic.C
 		return nil, err
 	}
 	defer stream.Close()
+	defer stream.CancelRead(0)
 	_, err = stream.Write(buffer.Bytes())
 	if err != nil {
 		return nil, err

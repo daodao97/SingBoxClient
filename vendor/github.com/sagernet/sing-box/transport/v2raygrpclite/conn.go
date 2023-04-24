@@ -156,3 +156,7 @@ func (c *GunConn) SetReadDeadline(t time.Time) error {
 func (c *GunConn) SetWriteDeadline(t time.Time) error {
 	return os.ErrInvalid
 }
+
+func (c *GunConn) NeedAdditionalReadDeadline() bool {
+	return true
+}

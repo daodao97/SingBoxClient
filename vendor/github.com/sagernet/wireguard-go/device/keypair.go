@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  *
- * Copyright (C) 2017-2022 WireGuard LLC. All Rights Reserved.
+ * Copyright (C) 2017-2023 WireGuard LLC. All Rights Reserved.
  */
 
 package device
@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/atomic"
+	"github.com/sagernet/sing/common/atomic"
 	"github.com/sagernet/wireguard-go/replay"
 )
 

@@ -57,7 +57,7 @@ func NewGVisor(
 		return nil, E.New("gVisor stack is unsupported on current platform")
 	}
 
-	return &GVisor{
+	gStack := &GVisor{
 		ctx:                    options.Context,
 		tun:                    gTun,
 		tunMtu:                 options.MTU,
@@ -66,8 +66,11 @@ func NewGVisor(
 		router:                 options.Router,
 		handler:                options.Handler,
 		logger:                 options.Logger,
-		routeMapping:           NewRouteMapping(options.UDPTimeout),
-	}, nil
+	}
+	if gStack.router != nil {
+		gStack.routeMapping = NewRouteMapping(options.UDPTimeout)
+	}
+	return gStack, nil
 }
 
 func (t *GVisor) Start() error {
@@ -152,7 +155,7 @@ func (t *GVisor) Start() error {
 			}
 		}()
 	})
-	ipStack.SetTransportProtocolHandler(tcp.ProtocolNumber, func(id stack.TransportEndpointID, buffer *stack.PacketBuffer) bool {
+	ipStack.SetTransportProtocolHandler(tcp.ProtocolNumber, func(id stack.TransportEndpointID, buffer stack.PacketBufferPtr) bool {
 		if t.router != nil {
 			var routeSession RouteSession
 			routeSession.Network = syscall.IPPROTO_TCP
@@ -215,7 +218,7 @@ func (t *GVisor) Start() error {
 				}
 			}()
 		})
-		ipStack.SetTransportProtocolHandler(udp.ProtocolNumber, func(id stack.TransportEndpointID, buffer *stack.PacketBuffer) bool {
+		ipStack.SetTransportProtocolHandler(udp.ProtocolNumber, func(id stack.TransportEndpointID, buffer stack.PacketBufferPtr) bool {
 			if t.router != nil {
 				var routeSession RouteSession
 				routeSession.Network = syscall.IPPROTO_UDP

@@ -41,7 +41,9 @@ func NewPacket() *Buffer {
 }
 
 func NewSize(size int) *Buffer {
-	if size > 65535 {
+	if size == 0 {
+		return &Buffer{}
+	} else if size > 65535 {
 		return &Buffer{
 			data: make([]byte, size),
 		}
@@ -77,6 +79,9 @@ func StackNewPacket() *Buffer {
 }
 
 func StackNewSize(size int) *Buffer {
+	if size == 0 {
+		return &Buffer{}
+	}
 	if common.UnsafeBuffer {
 		return &Buffer{
 			data: Make(size),

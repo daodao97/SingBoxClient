@@ -99,7 +99,7 @@ func (e *WintunEndpoint) ARPHardwareType() header.ARPHardwareType {
 	return header.ARPHardwareNone
 }
 
-func (e *WintunEndpoint) AddHeader(buffer *stack.PacketBuffer) {
+func (e *WintunEndpoint) AddHeader(buffer stack.PacketBufferPtr) {
 }
 
 func (e *WintunEndpoint) WritePackets(packetBufferList stack.PacketBufferList) (int, tcpip.Error) {

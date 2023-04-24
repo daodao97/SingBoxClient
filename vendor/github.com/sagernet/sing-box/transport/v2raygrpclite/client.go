@@ -12,7 +12,7 @@ import (
 	"github.com/sagernet/sing-box/common/tls"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-box/transport/v2rayhttp"
-	"github.com/sagernet/sing/common/bufio/deadline"
+	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 
@@ -34,9 +34,16 @@ type Client struct {
 	transport  *http2.Transport
 	options    option.V2RayGRPCOptions
 	url        *url.URL
+	host       string
 }
 
 func NewClient(ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr, options option.V2RayGRPCOptions, tlsConfig tls.Config) adapter.V2RayClientTransport {
+	var host string
+	if tlsConfig != nil && tlsConfig.ServerName() != "" {
+		host = M.ParseSocksaddrHostPort(tlsConfig.ServerName(), serverAddr.Port).String()
+	} else {
+		host = serverAddr.String()
+	}
 	client := &Client{
 		ctx:        ctx,
 		dialer:     dialer,
@@ -53,6 +60,7 @@ func NewClient(ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr, opt
 			Path:    "/" + options.ServiceName + "/Tun",
 			RawPath: "/" + url.PathEscape(options.ServiceName) + "/Tun",
 		},
+		host: host,
 	}
 
 	if tlsConfig == nil {
@@ -82,18 +90,22 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 		Body:   pipeInReader,
 		URL:    c.url,
 		Header: defaultClientHeader,
+		Host:   c.host,
 	}
 	request = request.WithContext(ctx)
 	conn := newLateGunConn(pipeInWriter)
 	go func() {
 		response, err := c.transport.RoundTrip(request)
-		if err == nil {
-			conn.setup(response.Body, nil)
-		} else {
+		if err != nil {
 			conn.setup(nil, err)
+		} else if response.StatusCode != 200 {
+			response.Body.Close()
+			conn.setup(nil, E.New("unexpected status: ", response.StatusCode, " ", response.Status))
+		} else {
+			conn.setup(response.Body, nil)
 		}
 	}()
-	return deadline.NewConn(conn), nil
+	return conn, nil
 }
 
 func (c *Client) Close() error {

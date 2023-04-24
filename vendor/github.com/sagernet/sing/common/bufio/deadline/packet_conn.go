@@ -11,11 +11,21 @@ import (
 
 type PacketConn struct {
 	N.NetPacketConn
-	reader *PacketReader
+	reader PacketReader
 }
 
 func NewPacketConn(conn N.NetPacketConn) *PacketConn {
+	if deadlineConn, isDeadline := conn.(*PacketConn); isDeadline {
+		return deadlineConn
+	}
 	return &PacketConn{NetPacketConn: conn, reader: NewPacketReader(conn)}
+}
+
+func NewFallbackPacketConn(conn N.NetPacketConn) *PacketConn {
+	if deadlineConn, isDeadline := conn.(*PacketConn); isDeadline {
+		return deadlineConn
+	}
+	return &PacketConn{NetPacketConn: conn, reader: NewFallbackPacketReader(conn)}
 }
 
 func (c *PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
@@ -40,4 +50,8 @@ func (c *PacketConn) WriterReplaceable() bool {
 
 func (c *PacketConn) Upstream() any {
 	return c.NetPacketConn
+}
+
+func (c *PacketConn) NeedAdditionalReadDeadline() bool {
+	return false
 }
