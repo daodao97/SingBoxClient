@@ -125,7 +125,7 @@ func (w *ExtendedWriterWrapper) Upstream() any {
 	return w.Writer
 }
 
-func (w *ExtendedReaderWrapper) WriterReplaceable() bool {
+func (w *ExtendedWriterWrapper) WriterReplaceable() bool {
 	return true
 }
 

@@ -2,6 +2,8 @@ package mux
 
 import (
 	"encoding/binary"
+	"io"
+	"net"
 
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
@@ -122,6 +124,33 @@ func (c *serverPacketConn) WritePacket(buffer *buf.Buffer, destination M.Socksad
 	return c.ExtendedConn.WriteBuffer(buffer)
 }
 
+func (c *serverPacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+	var length uint16
+	err = binary.Read(c.ExtendedConn, binary.BigEndian, &length)
+	if err != nil {
+		return
+	}
+	if cap(p) < int(length) {
+		return 0, nil, io.ErrShortBuffer
+	}
+	n, err = io.ReadFull(c.ExtendedConn, p[:length])
+	return
+}
+
+func (c *serverPacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+	if !c.responseWritten {
+		_, err = c.ExtendedConn.Write([]byte{statusSuccess})
+		if err != nil {
+			return
+		}
+	}
+	err = binary.Write(c.ExtendedConn, binary.BigEndian, uint16(len(p)))
+	if err != nil {
+		return
+	}
+	return c.ExtendedConn.Write(p)
+}
+
 func (c *serverPacketConn) NeedAdditionalReadDeadline() bool {
 	return true
 }
@@ -158,6 +187,46 @@ func (c *serverPacketAddrConn) HandshakeFailure(err error) error {
 		rw.WriteVString(_buffer, errMessage),
 	)
 	return c.ExtendedConn.WriteBuffer(buffer)
+}
+
+func (c *serverPacketAddrConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+	destination, err := M.SocksaddrSerializer.ReadAddrPort(c.ExtendedConn)
+	if err != nil {
+		return
+	}
+	if destination.IsFqdn() {
+		addr = destination
+	} else {
+		addr = destination.UDPAddr()
+	}
+	var length uint16
+	err = binary.Read(c.ExtendedConn, binary.BigEndian, &length)
+	if err != nil {
+		return
+	}
+	if cap(p) < int(length) {
+		return 0, nil, io.ErrShortBuffer
+	}
+	n, err = io.ReadFull(c.ExtendedConn, p[:length])
+	return
+}
+
+func (c *serverPacketAddrConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+	if !c.responseWritten {
+		_, err = c.ExtendedConn.Write([]byte{statusSuccess})
+		if err != nil {
+			return
+		}
+	}
+	err = M.SocksaddrSerializer.WriteAddrPort(c.ExtendedConn, M.SocksaddrFromNet(addr))
+	if err != nil {
+		return
+	}
+	err = binary.Write(c.ExtendedConn, binary.BigEndian, uint16(len(p)))
+	if err != nil {
+		return
+	}
+	return c.ExtendedConn.Write(p)
 }
 
 func (c *serverPacketAddrConn) ReadPacket(buffer *buf.Buffer) (destination M.Socksaddr, err error) {

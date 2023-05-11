@@ -136,6 +136,17 @@ func (c *conn) ReadPacket(buffer *buf.Buffer) (addr M.Socksaddr, err error) {
 	}
 }
 
+func (c *conn) WaitReadPacket(newBuffer func() *buf.Buffer) (destination M.Socksaddr, err error) {
+	select {
+	case p := <-c.data:
+		_, err = newBuffer().ReadOnceFrom(p.data)
+		p.data.Release()
+		return p.destination, err
+	case <-c.ctx.Done():
+		return M.Socksaddr{}, io.ErrClosedPipe
+	}
+}
+
 func (c *conn) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
 	return c.source.WritePacket(buffer, destination)
 }

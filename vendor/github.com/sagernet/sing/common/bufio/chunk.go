@@ -56,6 +56,14 @@ func (c *ChunkReader) Read(p []byte) (n int, err error) {
 	return c.cache.Read(p)
 }
 
+func (c *ChunkReader) ReadByte() (byte, error) {
+	buffer, err := c.ReadChunk()
+	if err != nil {
+		return 0, err
+	}
+	return buffer.ReadByte()
+}
+
 func (c *ChunkReader) ReadChunk() (*buf.Buffer, error) {
 	if c.cache == nil {
 		c.cache = buf.NewSize(c.maxChunkSize)

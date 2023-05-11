@@ -8,8 +8,7 @@ func NOP() ContextLogger {
 	return (*nopLogger)(nil)
 }
 
-type nopLogger struct {
-}
+type nopLogger struct{}
 
 func (f *nopLogger) Trace(args ...any) {
 }

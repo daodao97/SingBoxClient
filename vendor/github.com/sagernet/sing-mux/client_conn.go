@@ -209,6 +209,37 @@ func (c *clientPacketConn) FrontHeadroom() int {
 	return 2
 }
 
+func (c *clientPacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+	if !c.responseRead {
+		err = c.readResponse()
+		if err != nil {
+			return
+		}
+		c.responseRead = true
+	}
+	var length uint16
+	err = binary.Read(c.ExtendedConn, binary.BigEndian, &length)
+	if err != nil {
+		return
+	}
+	if cap(p) < int(length) {
+		return 0, nil, io.ErrShortBuffer
+	}
+	n, err = io.ReadFull(c.ExtendedConn, p[:length])
+	return
+}
+
+func (c *clientPacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+	if !c.requestWritten {
+		return c.writeRequest(p)
+	}
+	err = binary.Write(c.ExtendedConn, binary.BigEndian, uint16(len(p)))
+	if err != nil {
+		return
+	}
+	return c.ExtendedConn.Write(p)
+}
+
 func (c *clientPacketConn) ReadPacket(buffer *buf.Buffer) (destination M.Socksaddr, err error) {
 	err = c.ReadBuffer(buffer)
 	return

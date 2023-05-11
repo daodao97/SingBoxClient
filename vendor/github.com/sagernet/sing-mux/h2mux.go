@@ -37,7 +37,8 @@ func newH2MuxServer(conn net.Conn) *h2MuxServerSession {
 		inbound: make(chan net.Conn),
 		done:    make(chan struct{}),
 		server: http2.Server{
-			IdleTimeout: idleTimeout,
+			IdleTimeout:      idleTimeout,
+			MaxReadFrameSize: buf.BufferSize,
 		},
 	}
 	go func() {
@@ -168,7 +169,8 @@ func newH2MuxClient(conn net.Conn) (*h2MuxClientSession, error) {
 			DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
 				return conn, nil
 			},
-			ReadIdleTimeout: idleTimeout,
+			ReadIdleTimeout:  idleTimeout,
+			MaxReadFrameSize: buf.BufferSize,
 		},
 		done: make(chan struct{}),
 	}

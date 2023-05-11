@@ -16,7 +16,7 @@ require (
 
 require (
 	berty.tech/go-libtor v1.0.385 // indirect
-	github.com/Dreamacro/clash v1.15.0 // indirect
+	github.com/Dreamacro/clash v1.15.1 // indirect
 	github.com/ajg/form v1.5.1 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/caddyserver/certmagic v0.17.2 // indirect
@@ -48,7 +48,7 @@ require (
 	github.com/libdns/libdns v0.2.1 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/mholt/acmez v1.1.0 // indirect
-	github.com/miekg/dns v1.1.53 // indirect
+	github.com/miekg/dns v1.1.54 // indirect
 	github.com/onsi/ginkgo/v2 v2.2.0 // indirect
 	github.com/ooni/go-libtor v1.1.7 // indirect
 	github.com/oschwald/maxminddb-golang v1.10.0 // indirect
@@ -64,10 +64,11 @@ require (
 	github.com/sagernet/netlink v0.0.0-20220905062125-8043b4a9aa97 // indirect
 	github.com/sagernet/quic-go v0.0.0-20230202071646-a8c8afb18b32 // indirect
 	github.com/sagernet/reality v0.0.0-20230406110435-ee17307e7691 // indirect
-	github.com/sagernet/sing v0.2.5-0.20230423085534-0902e6216207 // indirect
-	github.com/sagernet/sing-dns v0.1.5-0.20230415085626-111ecf799dfc // indirect
-	github.com/sagernet/sing-mux v0.0.0-20230424015424-9b0d527c3bb0 // indirect
+	github.com/sagernet/sing v0.2.5-0.20230501044132-8365dd48a17a // indirect
+	github.com/sagernet/sing-dns v0.1.5-0.20230426113254-25d948c44223 // indirect
+	github.com/sagernet/sing-mux v0.0.0-20230425130511-b0a6ffd8406f // indirect
 	github.com/sagernet/sing-shadowsocks v0.2.2-0.20230417102954-f77257340507 // indirect
+	github.com/sagernet/sing-shadowsocks2 v0.0.0-20230501032827-681c9c4ee0e9 // indirect
 	github.com/sagernet/sing-shadowtls v0.1.2-0.20230417103049-4f682e05f19b // indirect
 	github.com/sagernet/sing-tun v0.1.5-0.20230422121432-209ec123ca7b // indirect
 	github.com/sagernet/sing-vmess v0.1.5-0.20230417103030-8c3070ae3fb3 // indirect
@@ -85,7 +86,7 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	go4.org/netipx v0.0.0-20230303233057-f1b76eb4bb35 // indirect
 	golang.org/x/crypto v0.8.0 // indirect
-	golang.org/x/exp v0.0.0-20230321023759-10a507213a29 // indirect
+	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53 // indirect
 	golang.org/x/mod v0.8.0 // indirect
 	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/sys v0.7.0 // indirect

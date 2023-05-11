@@ -2,7 +2,7 @@
 ## explicit; go 1.13
 berty.tech/go-libtor
 berty.tech/go-libtor/libtor
-# github.com/Dreamacro/clash v1.15.0
+# github.com/Dreamacro/clash v1.15.1
 ## explicit; go 1.20
 github.com/Dreamacro/clash/common/pool
 github.com/Dreamacro/clash/component/auth
@@ -176,7 +176,7 @@ github.com/logrusorgru/aurora
 ## explicit; go 1.18
 github.com/mholt/acmez
 github.com/mholt/acmez/acme
-# github.com/miekg/dns v1.1.53
+# github.com/miekg/dns v1.1.54
 ## explicit; go 1.19
 github.com/miekg/dns
 # github.com/onsi/ginkgo/v2 v2.2.0
@@ -263,7 +263,7 @@ github.com/sagernet/quic-go/quicvarint
 # github.com/sagernet/reality v0.0.0-20230406110435-ee17307e7691
 ## explicit; go 1.18
 github.com/sagernet/reality
-# github.com/sagernet/sing v0.2.5-0.20230423085534-0902e6216207
+# github.com/sagernet/sing v0.2.5-0.20230501044132-8365dd48a17a
 ## explicit; go 1.18
 github.com/sagernet/sing/common
 github.com/sagernet/sing/common/abx
@@ -339,7 +339,6 @@ github.com/sagernet/sing-box/experimental/clashapi/cachefile
 github.com/sagernet/sing-box/experimental/clashapi/compatible
 github.com/sagernet/sing-box/experimental/clashapi/trafficontrol
 github.com/sagernet/sing-box/experimental/libbox/platform
-github.com/sagernet/sing-box/experimental/trackerconn
 github.com/sagernet/sing-box/experimental/v2rayapi
 github.com/sagernet/sing-box/inbound
 github.com/sagernet/sing-box/include
@@ -365,11 +364,11 @@ github.com/sagernet/sing-box/transport/v2rayquic
 github.com/sagernet/sing-box/transport/v2raywebsocket
 github.com/sagernet/sing-box/transport/vless
 github.com/sagernet/sing-box/transport/wireguard
-# github.com/sagernet/sing-dns v0.1.5-0.20230415085626-111ecf799dfc
+# github.com/sagernet/sing-dns v0.1.5-0.20230426113254-25d948c44223
 ## explicit; go 1.18
 github.com/sagernet/sing-dns
 github.com/sagernet/sing-dns/quic
-# github.com/sagernet/sing-mux v0.0.0-20230424015424-9b0d527c3bb0
+# github.com/sagernet/sing-mux v0.0.0-20230425130511-b0a6ffd8406f
 ## explicit; go 1.18
 github.com/sagernet/sing-mux
 # github.com/sagernet/sing-shadowsocks v0.2.2-0.20230417102954-f77257340507
@@ -377,8 +376,15 @@ github.com/sagernet/sing-mux
 github.com/sagernet/sing-shadowsocks
 github.com/sagernet/sing-shadowsocks/shadowaead
 github.com/sagernet/sing-shadowsocks/shadowaead_2022
-github.com/sagernet/sing-shadowsocks/shadowimpl
-github.com/sagernet/sing-shadowsocks/shadowstream
+# github.com/sagernet/sing-shadowsocks2 v0.0.0-20230501032827-681c9c4ee0e9
+## explicit; go 1.18
+github.com/sagernet/sing-shadowsocks2
+github.com/sagernet/sing-shadowsocks2/cipher
+github.com/sagernet/sing-shadowsocks2/internal/legacykey
+github.com/sagernet/sing-shadowsocks2/internal/shadowio
+github.com/sagernet/sing-shadowsocks2/shadowaead
+github.com/sagernet/sing-shadowsocks2/shadowaead_2022
+github.com/sagernet/sing-shadowsocks2/shadowstream
 # github.com/sagernet/sing-shadowtls v0.1.2-0.20230417103049-4f682e05f19b
 ## explicit; go 1.18
 github.com/sagernet/sing-shadowtls
@@ -483,8 +489,8 @@ golang.org/x/crypto/poly1305
 golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-# golang.org/x/exp v0.0.0-20230321023759-10a507213a29
-## explicit; go 1.18
+# golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53
+## explicit; go 1.20
 golang.org/x/exp/constraints
 golang.org/x/exp/slices
 # golang.org/x/mod v0.8.0

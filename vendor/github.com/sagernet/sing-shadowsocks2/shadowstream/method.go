@@ -1,25 +1,27 @@
 package shadowstream
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
-	"crypto/rand"
 	"crypto/rc4"
-	"io"
 	"net"
 	"os"
 
-	"github.com/sagernet/sing-shadowsocks"
+	C "github.com/sagernet/sing-shadowsocks2/cipher"
+	"github.com/sagernet/sing-shadowsocks2/internal/legacykey"
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
+	"github.com/sagernet/sing/common/bufio"
+	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 
 	"golang.org/x/crypto/chacha20"
 )
 
-var List = []string{
+var MethodList = []string{
 	"aes-128-ctr",
 	"aes-192-ctr",
 	"aes-256-ctr",
@@ -31,8 +33,11 @@ var List = []string{
 	"xchacha20",
 }
 
+func init() {
+	C.RegisterMethod(MethodList, NewMethod)
+}
+
 type Method struct {
-	name               string
 	keyLength          int
 	saltLength         int
 	encryptConstructor func(key []byte, salt []byte) (cipher.Stream, error)
@@ -40,11 +45,9 @@ type Method struct {
 	key                []byte
 }
 
-func New(method string, key []byte, password string) (shadowsocks.Method, error) {
-	m := &Method{
-		name: method,
-	}
-	switch method {
+func NewMethod(ctx context.Context, methodName string, options C.MethodOptions) (C.Method, error) {
+	m := &Method{}
+	switch methodName {
 	case "aes-128-ctr":
 		m.keyLength = 16
 		m.saltLength = aes.BlockSize
@@ -111,14 +114,14 @@ func New(method string, key []byte, password string) (shadowsocks.Method, error)
 	default:
 		return nil, os.ErrInvalid
 	}
-	if len(key) == m.keyLength {
-		m.key = key
-	} else if len(key) > 0 {
-		return nil, shadowsocks.ErrBadKey
-	} else if password != "" {
-		m.key = shadowsocks.Key([]byte(password), m.keyLength)
+	if len(options.Key) == m.keyLength {
+		m.key = options.Key
+	} else if len(options.Key) > 0 {
+		return nil, E.New("bad key length, required ", m.keyLength, ", got ", len(options.Key))
+	} else if options.Password != "" {
+		m.key = legacykey.Key([]byte(options.Password), m.keyLength)
 	} else {
-		return nil, shadowsocks.ErrMissingPassword
+		return nil, C.ErrMissingPassword
 	}
 	return m, nil
 }
@@ -133,81 +136,46 @@ func blockStream(blockCreator func(key []byte) (cipher.Block, error), streamCrea
 	}
 }
 
-func (m *Method) Name() string {
-	return m.name
-}
-
 func (m *Method) DialConn(conn net.Conn, destination M.Socksaddr) (net.Conn, error) {
-	shadowsocksConn := &clientConn{
-		Method:      m,
-		Conn:        conn,
-		destination: destination,
+	ssConn := &clientConn{
+		ExtendedConn: bufio.NewExtendedConn(conn),
+		method:       m,
+		destination:  destination,
 	}
-	return shadowsocksConn, shadowsocksConn.writeRequest()
+	return ssConn, common.Error(ssConn.Write(nil))
 }
 
 func (m *Method) DialEarlyConn(conn net.Conn, destination M.Socksaddr) net.Conn {
 	return &clientConn{
-		Method:      m,
-		Conn:        conn,
-		destination: destination,
+		ExtendedConn: bufio.NewExtendedConn(conn),
+		method:       m,
+		destination:  destination,
 	}
 }
 
 func (m *Method) DialPacketConn(conn net.Conn) N.NetPacketConn {
-	return &clientPacketConn{m, conn}
+	return &clientPacketConn{
+		ExtendedConn: bufio.NewExtendedConn(conn),
+		method:       m,
+	}
 }
 
 type clientConn struct {
-	*Method
-	net.Conn
+	N.ExtendedConn
+	method      *Method
 	destination M.Socksaddr
 	readStream  cipher.Stream
 	writeStream cipher.Stream
 }
 
-func (c *clientConn) writeRequest() error {
-	_buffer := buf.StackNewSize(c.saltLength + M.SocksaddrSerializer.AddrPortLen(c.destination))
-	defer common.KeepAlive(_buffer)
-	buffer := common.Dup(_buffer)
-	defer buffer.Release()
-
-	salt := buffer.Extend(c.saltLength)
-	common.Must1(io.ReadFull(rand.Reader, salt))
-
-	stream, err := c.encryptConstructor(c.key, salt)
-	if err != nil {
-		return err
-	}
-
-	err = M.SocksaddrSerializer.WriteAddrPort(buffer, c.destination)
-	if err != nil {
-		return err
-	}
-
-	stream.XORKeyStream(buffer.From(c.saltLength), buffer.From(c.saltLength))
-
-	_, err = c.Conn.Write(buffer.Bytes())
-	if err != nil {
-		return err
-	}
-
-	c.writeStream = stream
-	return nil
-}
-
 func (c *clientConn) readResponse() error {
-	if c.readStream != nil {
-		return nil
-	}
-	_salt := buf.Make(c.saltLength)
-	defer common.KeepAlive(_salt)
-	salt := common.Dup(_salt)
-	_, err := io.ReadFull(c.Conn, salt)
+	saltBuffer := buf.NewSize(c.method.saltLength)
+	defer saltBuffer.Release()
+	_, err := saltBuffer.ReadFullFrom(c.ExtendedConn, c.method.saltLength)
 	if err != nil {
 		return err
 	}
-	c.readStream, err = c.decryptConstructor(c.key, salt)
+	c.readStream, err = c.method.decryptConstructor(c.method.key, saltBuffer.Bytes())
 	return err
 }
 
@@ -218,7 +186,7 @@ func (c *clientConn) Read(p []byte) (n int, err error) {
 			return
 		}
 	}
-	n, err = c.Conn.Read(p)
+	n, err = c.ExtendedConn.Read(p)
 	if err != nil {
 		return
 	}
@@ -228,70 +196,113 @@ func (c *clientConn) Read(p []byte) (n int, err error) {
 
 func (c *clientConn) Write(p []byte) (n int, err error) {
 	if c.writeStream == nil {
-		err = c.writeRequest()
+		buffer := buf.NewSize(c.method.saltLength + M.SocksaddrSerializer.AddrPortLen(c.destination) + len(p))
+		defer buffer.Release()
+		buffer.WriteRandom(c.method.saltLength)
+		common.Must(M.SocksaddrSerializer.WriteAddrPort(buffer, c.destination))
+		common.Must1(buffer.Write(p))
+		c.writeStream, err = c.method.encryptConstructor(c.method.key, buffer.To(c.method.saltLength))
 		if err != nil {
 			return
 		}
+		c.writeStream.XORKeyStream(buffer.From(c.method.saltLength), buffer.From(c.method.saltLength))
+		_, err = c.ExtendedConn.Write(buffer.Bytes())
+		if err == nil {
+			n = len(p)
+		}
+		return
 	}
-
-	c.writeStream.XORKeyStream(p, p)
-	return c.Conn.Write(p)
+	return c.ExtendedConn.Write(p)
 }
 
-func (c *clientConn) NeedAdditionalReadDeadline() bool {
-	return true
+func (c *clientConn) ReadBuffer(buffer *buf.Buffer) error {
+	if c.readStream == nil {
+		err := c.readResponse()
+		if err != nil {
+			return err
+		}
+	}
+	err := c.ExtendedConn.ReadBuffer(buffer)
+	if err != nil {
+		return err
+	}
+	c.readStream.XORKeyStream(buffer.Bytes(), buffer.Bytes())
+	return nil
+}
+
+func (c *clientConn) WriteBuffer(buffer *buf.Buffer) error {
+	if c.writeStream == nil {
+		var err error
+		header := buf.With(buffer.ExtendHeader(c.method.saltLength + M.SocksaddrSerializer.AddrPortLen(c.destination)))
+		header.WriteRandom(c.method.saltLength)
+		common.Must(M.SocksaddrSerializer.WriteAddrPort(header, c.destination))
+		c.writeStream, err = c.method.encryptConstructor(c.method.key, header.To(c.method.saltLength))
+		if err != nil {
+			return err
+		}
+		c.writeStream.XORKeyStream(buffer.From(c.method.saltLength), buffer.From(c.method.saltLength))
+	} else {
+		c.writeStream.XORKeyStream(buffer.Bytes(), buffer.Bytes())
+	}
+	return c.ExtendedConn.WriteBuffer(buffer)
+}
+
+func (c *clientConn) FrontHeadroom() int {
+	if c.writeStream == nil {
+		return c.method.saltLength + M.SocksaddrSerializer.AddrPortLen(c.destination)
+	}
+	return 0
+}
+
+func (c *clientConn) NeedHandshake() bool {
+	return c.writeStream == nil
 }
 
 func (c *clientConn) Upstream() any {
-	return c.Conn
+	return c.ExtendedConn
 }
 
 type clientPacketConn struct {
-	*Method
-	net.Conn
-}
-
-func (c *clientPacketConn) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
-	defer buffer.Release()
-	header := buf.With(buffer.ExtendHeader(c.saltLength + M.SocksaddrSerializer.AddrPortLen(destination)))
-	common.Must1(header.ReadFullFrom(rand.Reader, c.saltLength))
-	err := M.SocksaddrSerializer.WriteAddrPort(header, destination)
-	if err != nil {
-		return err
-	}
-	stream, err := c.encryptConstructor(c.key, buffer.To(c.saltLength))
-	if err != nil {
-		return err
-	}
-	stream.XORKeyStream(buffer.From(c.saltLength), buffer.From(c.saltLength))
-	return common.Error(c.Write(buffer.Bytes()))
+	N.ExtendedConn
+	method *Method
 }
 
 func (c *clientPacketConn) ReadPacket(buffer *buf.Buffer) (M.Socksaddr, error) {
-	n, err := c.Read(buffer.FreeBytes())
+	err := c.ReadBuffer(buffer)
 	if err != nil {
 		return M.Socksaddr{}, err
 	}
-	buffer.Truncate(n)
-	stream, err := c.decryptConstructor(c.key, buffer.To(c.saltLength))
+	stream, err := c.method.decryptConstructor(c.method.key, buffer.To(c.method.saltLength))
 	if err != nil {
 		return M.Socksaddr{}, err
 	}
-	stream.XORKeyStream(buffer.From(c.saltLength), buffer.From(c.saltLength))
-	buffer.Advance(c.saltLength)
+	stream.XORKeyStream(buffer.From(c.method.saltLength), buffer.From(c.method.saltLength))
+	buffer.Advance(c.method.saltLength)
 	return M.SocksaddrSerializer.ReadAddrPort(buffer)
 }
 
+func (c *clientPacketConn) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
+	header := buf.With(buffer.ExtendHeader(c.method.saltLength + M.SocksaddrSerializer.AddrPortLen(destination)))
+	header.WriteRandom(c.method.saltLength)
+	common.Must(M.SocksaddrSerializer.WriteAddrPort(header, destination))
+	stream, err := c.method.encryptConstructor(c.method.key, buffer.To(c.method.saltLength))
+	if err != nil {
+		return err
+	}
+	stream.XORKeyStream(buffer.From(c.method.saltLength), buffer.From(c.method.saltLength))
+	return c.ExtendedConn.WriteBuffer(buffer)
+}
+
 func (c *clientPacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	n, err = c.Read(p)
+	n, err = c.ExtendedConn.Read(p)
 	if err != nil {
 		return
 	}
-	stream, err := c.decryptConstructor(c.key, p[:c.saltLength])
+	stream, err := c.method.decryptConstructor(c.method.key, p[:c.method.saltLength])
 	if err != nil {
 		return
 	}
-	buffer := buf.As(p[c.saltLength:n])
+	buffer := buf.As(p[c.method.saltLength:n])
 	stream.XORKeyStream(buffer.Bytes(), buffer.Bytes())
 	destination, err := M.SocksaddrSerializer.ReadAddrPort(buffer)
 	if err != nil {
@@ -308,35 +319,27 @@ func (c *clientPacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) 
 
 func (c *clientPacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	destination := M.SocksaddrFromNet(addr)
-	_buffer := buf.StackNewSize(c.saltLength + M.SocksaddrSerializer.AddrPortLen(destination) + len(p))
-	defer common.KeepAlive(_buffer)
-	buffer := common.Dup(_buffer)
+	buffer := buf.NewSize(c.method.saltLength + M.SocksaddrSerializer.AddrPortLen(destination) + len(p))
 	defer buffer.Release()
-	common.Must1(buffer.ReadFullFrom(rand.Reader, c.saltLength))
-	err = M.SocksaddrSerializer.WriteAddrPort(buffer, M.SocksaddrFromNet(addr))
+	buffer.WriteRandom(c.method.saltLength)
+	common.Must(M.SocksaddrSerializer.WriteAddrPort(buffer, destination))
+	stream, err := c.method.encryptConstructor(c.method.key, buffer.To(c.method.saltLength))
 	if err != nil {
 		return
 	}
-	_, err = buffer.Write(p)
-	if err != nil {
-		return
+	stream.XORKeyStream(buffer.From(c.method.saltLength), buffer.From(c.method.saltLength))
+	stream.XORKeyStream(buffer.Extend(len(p)), p)
+	_, err = c.ExtendedConn.Write(buffer.Bytes())
+	if err == nil {
+		n = len(p)
 	}
-	stream, err := c.encryptConstructor(c.key, buffer.To(c.saltLength))
-	if err != nil {
-		return
-	}
-	stream.XORKeyStream(buffer.From(c.saltLength), buffer.From(c.saltLength))
-	_, err = c.Write(buffer.Bytes())
-	if err != nil {
-		return
-	}
-	return len(p), nil
+	return
 }
 
 func (c *clientPacketConn) FrontHeadroom() int {
-	return c.saltLength + M.MaxSocksaddrLength
+	return c.method.saltLength + M.MaxSocksaddrLength
 }
 
 func (c *clientPacketConn) Upstream() any {
-	return c.Conn
+	return c.ExtendedConn
 }

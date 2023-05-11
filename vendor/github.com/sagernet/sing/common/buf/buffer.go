@@ -104,10 +104,6 @@ func With(data []byte) *Buffer {
 	}
 }
 
-func (b *Buffer) Closed() bool {
-	return b.closed
-}
-
 func (b *Buffer) Byte(index int) byte {
 	return b.data[b.start+index]
 }
