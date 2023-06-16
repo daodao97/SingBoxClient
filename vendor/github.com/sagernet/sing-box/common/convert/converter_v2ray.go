@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/sagernet/sing-box/option"
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/sagernet/sing-box/option"
 )
 
 func inArr(arr []string, current string) (res bool) {
@@ -21,7 +22,10 @@ func inArr(arr []string, current string) (res bool) {
 
 // ConvertsV2Ray convert V2Ray subscribe proxies data to clash proxies config
 func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
-	data := DecodeBase64(buf)
+	data, err := Base64Decode(string(buf))
+	if err != nil {
+		return nil, err
+	}
 
 	arr := strings.Split(string(data), "\n")
 
@@ -314,6 +318,7 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			}
 			proxies = append(proxies, ss)
 		case "ssr":
+			continue
 			dcBuf, err := encRaw.DecodeString(body)
 			if err != nil {
 				continue
