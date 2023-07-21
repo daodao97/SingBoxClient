@@ -20,7 +20,7 @@ require (
 	github.com/Dreamacro/protobytes v0.0.0-20230617041236-6500a9f4f158 // indirect
 	github.com/ajg/form v1.5.1 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
-	github.com/caddyserver/certmagic v0.19.0 // indirect
+	github.com/caddyserver/certmagic v0.18.2 // indirect
 	github.com/cloudflare/circl v1.2.1-0.20221019164342-6ab4dfed8f3c // indirect
 	github.com/cretz/bine v0.2.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -30,7 +30,7 @@ require (
 	github.com/getlantern/hex v0.0.0-20190417191902-c6586a6fe0b7 // indirect
 	github.com/getlantern/hidden v0.0.0-20190325191715-f02dbb02be55 // indirect
 	github.com/getlantern/ops v0.0.0-20190325191751-d70cb0d6f85f // indirect
-	github.com/go-chi/chi/v5 v5.0.10 // indirect
+	github.com/go-chi/chi/v5 v5.0.8 // indirect
 	github.com/go-chi/cors v1.2.1 // indirect
 	github.com/go-chi/render v1.0.3 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
@@ -83,7 +83,6 @@ require (
 	github.com/spf13/cast v1.5.1 // indirect
 	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
 	github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74 // indirect
-	github.com/zeebo/blake3 v0.2.3 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
@@ -105,6 +104,6 @@ require (
 )
 
 replace (
-	github.com/getlantern/notifier => ../notifier
-	github.com/sagernet/sing-box => ../sing-box
+	github.com/getlantern/notifier => ./pkg/notifier
+	github.com/sagernet/sing-box => ./pkg/sing-box
 )
