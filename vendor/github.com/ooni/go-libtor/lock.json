@@ -1,6 +1,0 @@
-{
-  "zlib": "04f42ceca40f73e2978b50e93806c2a18c1281fc",
-  "libevent": "c01cb1d685b70bc9ef102e08eba6ea3e928ae59c",
-  "openssl": "44da71693cdad2deb6430a47d3f3ee9f57065091",
-  "tor": "e390a7cdee2dab0abcbaf06fad9d03b028377a70"
-}

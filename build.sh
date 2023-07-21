@@ -6,7 +6,7 @@ set -x
 export LDFLAGS="-L/usr/local/opt/openssl@3/lib"
 export CPPFLAGS="-I/usr/local/opt/openssl@3/include"
 
-gobuild="go build -mod=vendor --tags with_quic,with_grpc,with_wireguard,with_shadowsocksr,with_ech,with_utls,with_acme,with_clash_api,with_gvisor"
+gobuild="go build -mod=vendor --tags with_quic,with_grpc,with_wireguard,with_shadowsocksr,with_ech,with_utls,with_clash_api,with_gvisor"
 
 function buildMacIcon() {
   rm -rf icons.iconset
