@@ -1,0 +1,26 @@
+linters:
+  disable-all: true
+  enable:
+    - gofumpt
+    - govet
+    - gci
+    - staticcheck
+    - paralleltest
+
+run:
+  skip-dirs:
+    - transport/simple-obfs
+    - transport/clashssr
+    - transport/cloudflaretls
+    - transport/shadowtls/tls
+    - transport/shadowtls/tls_go119
+
+linters-settings:
+  gci:
+    custom-order: true
+    sections:
+      - standard
+      - prefix(github.com/sagernet/)
+      - default
+  staticcheck:
+    go: '1.20'
