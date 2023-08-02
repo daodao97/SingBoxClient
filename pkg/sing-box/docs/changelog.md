@@ -1,3 +1,28 @@
+#### 1.3.5
+
+* Fixes and improvements
+* Introducing our [Apple tvOS](/installation/clients/sft) client applications **1**
+* Add per app proxy and app installed/updated trigger support for Android client
+* Add profile sharing support for Android/iOS/macOS clients
+
+**1**:
+
+Due to the requirement of tvOS 17, the app cannot be submitted to the App Store for the time being, and can only be downloaded through TestFlight.
+
+#### 1.3.4
+
+* Fixes and improvements
+* We're now on the [App Store](https://apps.apple.com/us/app/sing-box/id6451272673), always free! It should be noted that due to stricter and slower review, the release of Store versions will be delayed.
+* We've made a standalone version of the macOS client (the original Application Extension relies on App Store distribution), which you can download as SFM-version-universal.zip in the release artifacts.
+
+#### 1.3.3
+
+* Fixes and improvements
+
+#### 1.3.1-rc.1
+
+* Fix bugs and update dependencies
+
 #### 1.3.1-beta.3
 
 * Introducing our [new iOS](/installation/clients/sfi) and [macOS](/installation/clients/sfm) client applications **1**

@@ -37,8 +37,15 @@ nav:
       - Change Log: changelog.md
   - Installation:
       - From source: installation/from-source.md
+      - Package Manager:
+          - macOS: installation/package-manager/macOS.md
+          - Windows: installation/package-manager/windows.md
+          - Android: installation/package-manager/android.md
       - Clients:
+          - Specification: installation/clients/specification.md
           - iOS: installation/clients/sfi.md
+          - macOS: installation/clients/sfm.md
+          - Apple tvOS: installation/clients/sft.md
           - Android: installation/clients/sfa.md
   - Configuration:
       - configuration/index.md

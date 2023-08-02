@@ -2,6 +2,8 @@ package libbox
 
 import (
 	"os"
+	"os/user"
+	"strconv"
 
 	C "github.com/sagernet/sing-box/constant"
 
@@ -9,23 +11,34 @@ import (
 )
 
 var (
-	sBasePath string
-	sTempPath string
-	sUserID   int
-	sGroupID  int
+	sBasePath    string
+	sWorkingPath string
+	sTempPath    string
+	sUserID      int
+	sGroupID     int
+	sTVOS        bool
 )
 
-func Setup(basePath string, tempPath string, userID int, groupID int) {
+func Setup(basePath string, workingPath string, tempPath string, isTVOS bool) {
 	sBasePath = basePath
+	sWorkingPath = workingPath
 	sTempPath = tempPath
-	sUserID = userID
-	sGroupID = groupID
-	if sUserID == -1 {
-		sUserID = os.Getuid()
+	sUserID = os.Getuid()
+	sGroupID = os.Getgid()
+	sTVOS = isTVOS
+}
+
+func SetupWithUsername(basePath string, workingPath string, tempPath string, username string) error {
+	sBasePath = basePath
+	sWorkingPath = workingPath
+	sTempPath = tempPath
+	sUser, err := user.Lookup(username)
+	if err != nil {
+		return err
 	}
-	if sGroupID == -1 {
-		sGroupID = os.Getgid()
-	}
+	sUserID, _ = strconv.Atoi(sUser.Uid)
+	sGroupID, _ = strconv.Atoi(sUser.Gid)
+	return nil
 }
 
 func Version() string {

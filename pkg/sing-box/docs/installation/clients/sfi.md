@@ -5,10 +5,11 @@ Experimental iOS client for sing-box.
 #### Requirements
 
 * iOS 15.0+
-* macOS 12.0+ with Apple Silicon
+* An Apple account outside of mainland China
 
 #### Download
 
+* [AppStore](https://apps.apple.com/us/app/sing-box/id6451272673)
 * [TestFlight](https://testflight.apple.com/join/AcqO44FH)
 
 #### Note

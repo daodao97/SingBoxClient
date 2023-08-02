@@ -5,10 +5,11 @@
 #### 要求
 
 * iOS 15.0+
-* macOS 12.0+ with Apple Silicon
+* 一个非中国大陆地区的 Apple 账号
 
 #### 下载
 
+* [AppStore](https://apps.apple.com/us/app/sing-box/id6451272673)
 * [TestFlight](https://testflight.apple.com/join/AcqO44FH)
 
 #### 注意事项
