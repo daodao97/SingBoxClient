@@ -5,6 +5,15 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"io"
+	"math/rand"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/convert"
 	"github.com/sagernet/sing-box/common/json"
@@ -16,14 +25,6 @@ import (
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/service/filemanager"
-	"io"
-	"math/rand"
-	"net"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 var (
@@ -111,6 +112,9 @@ func NewProvider(ctx context.Context, router adapter.Router, logger log.ContextL
 func (s *Provider) Network() []string {
 	if s.group != nil {
 		return s.group.Select(N.NetworkTCP).Network()
+	}
+	if s.selected == nil {
+		return []string{N.NetworkTCP, N.NetworkUDP}
 	}
 	return s.selected.Network()
 }

@@ -4,8 +4,6 @@ import (
 	"embed"
 	_ "embed"
 	"fmt"
-	"github.com/sagernet/sing-box/common/json"
-	"github.com/skratchdot/open-golang/open"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,6 +15,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 	notify "github.com/getlantern/notifier"
 	"github.com/getlantern/systray"
+	"github.com/sagernet/sing-box/common/json"
+	"github.com/skratchdot/open-golang/open"
 )
 
 //go:embed icon/icon.png
