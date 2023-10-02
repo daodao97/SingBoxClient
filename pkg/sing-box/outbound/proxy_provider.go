@@ -5,15 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"io"
-	"math/rand"
-	"net"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
-
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/convert"
 	"github.com/sagernet/sing-box/common/json"
@@ -25,6 +16,14 @@ import (
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/service/filemanager"
+	"io"
+	"math/rand"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
 var (
@@ -39,7 +38,6 @@ var (
 
 type Provider struct {
 	myOutboundAdapter
-	ctx             context.Context
 	providerType    string
 	url             option.Listable[string]
 	path            option.Listable[string]
@@ -54,11 +52,11 @@ type Provider struct {
 	loadBalance     bool
 	includeKeyWords option.Listable[string]
 	excludeKeyWords option.Listable[string]
+	ctx             context.Context
 }
 
 func NewProvider(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.ProviderOutboundOptions) (*Provider, error) {
 	outbound := &Provider{
-		ctx: ctx,
 		myOutboundAdapter: myOutboundAdapter{
 			protocol: C.TypeProvider,
 			router:   router,
@@ -74,6 +72,7 @@ func NewProvider(ctx context.Context, router adapter.Router, logger log.ContextL
 		urlTest:         options.UrlTest,
 		includeKeyWords: options.IncludeKeyWords,
 		excludeKeyWords: options.ExcludeKeyWords,
+		ctx:             ctx,
 	}
 
 	if outbound.interval == "" {
@@ -101,8 +100,8 @@ func NewProvider(ctx context.Context, router adapter.Router, logger log.ContextL
 
 	if outbound.providerType == "url" && len(outbound.path) == 0 {
 		for _, v := range outbound.url {
-			providerPath := filepath.Join("provider", tag+"_"+md5V(v)+".txt")
-			outbound.path = append(outbound.path, filemanager.BasePath(ctx, providerPath))
+			providerPath := filepath.Join(filemanager.BasePath(context.Background(), "provider"), tag+"_"+md5V(v))
+			outbound.path = append(outbound.path, providerPath)
 		}
 	}
 
@@ -113,18 +112,15 @@ func (s *Provider) Network() []string {
 	if s.group != nil {
 		return s.group.Select(N.NetworkTCP).Network()
 	}
-	if s.selected == nil {
-		return []string{N.NetworkTCP, N.NetworkUDP}
-	}
 	return s.selected.Network()
 }
 
 func (s *Provider) getProviderContent(url, path string) ([]byte, error) {
-	bt, err := loadPath(s.ctx, path)
+	bt, err := loadPath(path)
 	if err == nil {
 		return bt, nil
 	}
-	return loadUrl(s.ctx, url, path)
+	return loadUrl(url, path)
 }
 
 func (s *Provider) Start() error {
@@ -139,12 +135,12 @@ func (s *Provider) Start() error {
 	switch s.providerType {
 	case "file":
 		for _, v := range s.path {
-			content, err := loadPath(s.ctx, v)
+			content, err := loadPath(v)
 			if err != nil {
 				return err
 			}
 			s.logger.Debug("loadPath ", v)
-			err = s.parseProvider(s.ctx, content)
+			err = s.parseProvider(context.Background(), content)
 			if err != nil {
 				return E.Extend(err, "parseProvider fail")
 			}
@@ -157,7 +153,7 @@ func (s *Provider) Start() error {
 			}
 			s.logger.Debug("loadUrl ", v)
 
-			err = s.parseProvider(s.ctx, content)
+			err = s.parseProvider(context.Background(), content)
 			if err != nil {
 				return E.Extend(err, "parseProvider fail")
 			}
@@ -171,14 +167,14 @@ func (s *Provider) Start() error {
 
 			timer.Timer(interval, func() {
 				for i, v := range s.url {
-					content, err := loadUrl(s.ctx, v, s.path[i])
+					content, err := loadUrl(v, s.path[i])
 					if err != nil {
 						s.logger.Error("loadUrl ", v, " fail")
 						return
 					}
 					s.logger.Debug("loadUrl ", v)
 
-					err = s.parseProvider(s.ctx, content)
+					err = s.parseProvider(context.Background(), content)
 					if err != nil {
 						s.logger.Error("parseProvider ", v, " fail")
 					}
@@ -228,7 +224,7 @@ func (s *Provider) updateSelected(outboundMap map[string]adapter.Outbound) error
 
 		s.logger.Debug("NewURLTestGroup ", len(outbounds))
 
-		s.group = NewURLTestGroup(context.Background(), s.router, s.logger, outbounds, s.urlTest.Url, interval, 100)
+		s.group = NewURLTestGroup(s.ctx, s.router, s.logger, outbounds, s.urlTest.Url, interval, 100)
 		s.group.Start()
 		s.logger.Debug("start NewURLTestGroup")
 
@@ -376,34 +372,32 @@ func getHttpContent(url string) ([]byte, error) {
 	return buf, nil
 }
 
-func loadUrl(ctx context.Context, url, path string) ([]byte, error) {
+func loadUrl(url, path string) ([]byte, error) {
 	content, err := getHttpContent(url)
 	if err != nil {
 		return nil, err
 	}
-	err = safeWrite(ctx, path, content)
+	err = safeWrite(path, content)
 	if err != nil {
 		return nil, err
 	}
 	return content, nil
 }
 
-func loadPath(ctx context.Context, path string) ([]byte, error) {
+func loadPath(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func safeWrite(ctx context.Context, path string, buf []byte) error {
-	if parentDir := filepath.Dir(path); parentDir != "" {
-		filemanager.MkdirAll(ctx, parentDir, 0o755)
+func safeWrite(path string, buf []byte) error {
+	dir := filepath.Dir(path)
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, dirMode); err != nil {
+			return err
+		}
 	}
 
-	saveFile, err := filemanager.Create(ctx, path)
-	if err != nil {
-		return E.Cause(err, "safeWrite file: ", path)
-	}
-	defer saveFile.Close()
-
-	return filemanager.WriteFile(ctx, saveFile.Name(), buf, fileMode)
+	return os.WriteFile(path, buf, fileMode)
 }
 
 func md5V(str string) string {

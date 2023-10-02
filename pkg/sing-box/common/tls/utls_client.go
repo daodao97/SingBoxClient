@@ -10,10 +10,11 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"strings"
 
-	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/option"
 	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/sagernet/sing/common/ntp"
 	utls "github.com/sagernet/utls"
 
 	"golang.org/x/net/http2"
@@ -113,7 +114,7 @@ func (c *utlsALPNWrapper) HandshakeContext(ctx context.Context) error {
 	return c.UConn.HandshakeContext(ctx)
 }
 
-func NewUTLSClient(router adapter.Router, serverAddress string, options option.OutboundTLSOptions) (*UTLSClientConfig, error) {
+func NewUTLSClient(ctx context.Context, serverAddress string, options option.OutboundTLSOptions) (*UTLSClientConfig, error) {
 	var serverName string
 	if options.ServerName != "" {
 		serverName = options.ServerName
@@ -127,7 +128,7 @@ func NewUTLSClient(router adapter.Router, serverAddress string, options option.O
 	}
 
 	var tlsConfig utls.Config
-	tlsConfig.Time = router.TimeFunc()
+	tlsConfig.Time = ntp.TimeFuncFromContext(ctx)
 	if options.DisableSNI {
 		tlsConfig.ServerName = "127.0.0.1"
 	} else {
@@ -168,8 +169,8 @@ func NewUTLSClient(router adapter.Router, serverAddress string, options option.O
 		}
 	}
 	var certificate []byte
-	if options.Certificate != "" {
-		certificate = []byte(options.Certificate)
+	if len(options.Certificate) > 0 {
+		certificate = []byte(strings.Join(options.Certificate, "\n"))
 	} else if options.CertificatePath != "" {
 		content, err := os.ReadFile(options.CertificatePath)
 		if err != nil {

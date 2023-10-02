@@ -24,7 +24,7 @@ func (d *delay) run(detour adapter.Outbound) {
 		for i := 0; i < 10; i++ {
 			ts, err := urltest.URLTest(context.Background(), "http://www.gstatic.com/generate_204", detour)
 			if err != nil {
-				ts = uint16(256)
+				ts = uint16(0)
 			}
 			d.maps.Store(detour, ts)
 			time.Sleep(time.Minute)

@@ -6,19 +6,18 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/common/dialer/conntrack"
+	"github.com/sagernet/sing-box/common/conntrack"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common/control"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
-	"github.com/sagernet/tfo-go"
 )
 
 type DefaultDialer struct {
-	dialer4     tfo.Dialer
-	dialer6     tfo.Dialer
+	dialer4     tcpDialer
+	dialer6     tcpDialer
 	udpDialer4  net.Dialer
 	udpDialer6  net.Dialer
 	udpListener net.ListenConfig
@@ -26,7 +25,7 @@ type DefaultDialer struct {
 	udpAddr6    string
 }
 
-func NewDefault(router adapter.Router, options option.DialerOptions) *DefaultDialer {
+func NewDefault(router adapter.Router, options option.DialerOptions) (*DefaultDialer, error) {
 	var dialer net.Dialer
 	var listener net.ListenConfig
 	if options.BindInterface != "" {
@@ -93,15 +92,29 @@ func NewDefault(router adapter.Router, options option.DialerOptions) *DefaultDia
 		udpDialer6.LocalAddr = &net.UDPAddr{IP: bindAddr.AsSlice()}
 		udpAddr6 = M.SocksaddrFrom(bindAddr, 0).String()
 	}
+	if options.TCPMultiPath {
+		if !go121Available {
+			return nil, E.New("MultiPath TCP requires go1.21, please recompile your binary.")
+		}
+		setMultiPathTCP(&dialer4)
+	}
+	tcpDialer4, err := newTCPDialer(dialer4, options.TCPFastOpen)
+	if err != nil {
+		return nil, err
+	}
+	tcpDialer6, err := newTCPDialer(dialer6, options.TCPFastOpen)
+	if err != nil {
+		return nil, err
+	}
 	return &DefaultDialer{
-		tfo.Dialer{Dialer: dialer4, DisableTFO: !options.TCPFastOpen},
-		tfo.Dialer{Dialer: dialer6, DisableTFO: !options.TCPFastOpen},
+		tcpDialer4,
+		tcpDialer6,
 		udpDialer4,
 		udpDialer6,
 		listener,
 		udpAddr4,
 		udpAddr6,
-	}
+	}, nil
 }
 
 func (d *DefaultDialer) DialContext(ctx context.Context, network string, address M.Socksaddr) (net.Conn, error) {

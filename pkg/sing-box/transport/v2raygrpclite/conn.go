@@ -11,10 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sagernet/sing-box/common/baderror"
 	"github.com/sagernet/sing/common"
+	"github.com/sagernet/sing/common/baderror"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
+	M "github.com/sagernet/sing/common/metadata"
 	"github.com/sagernet/sing/common/rw"
 )
 
@@ -138,7 +139,7 @@ func (c *GunConn) Close() error {
 }
 
 func (c *GunConn) LocalAddr() net.Addr {
-	return nil
+	return M.Socksaddr{}
 }
 
 func (c *GunConn) RemoteAddr() net.Addr {

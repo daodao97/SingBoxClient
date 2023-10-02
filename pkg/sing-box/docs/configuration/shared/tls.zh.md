@@ -8,9 +8,9 @@
   "min_version": "",
   "max_version": "",
   "cipher_suites": [],
-  "certificate": "",
+  "certificate": [],
   "certificate_path": "",
-  "key": "",
+  "key": [],
   "key_path": "",
   "acme": {
     "domain": [],
@@ -25,7 +25,15 @@
     "external_account": {
       "key_id": "",
       "mac_key": ""
-    }
+    },
+    "dns01_challenge": {}
+  },
+  "ech": {
+    "enabled": false,
+    "pq_signature_schemes_enabled": false,
+    "dynamic_record_sizing_disabled": false,
+    "key": [],
+    "key_path": ""
   },
   "reality": {
     "enabled": false,
@@ -56,13 +64,14 @@
   "min_version": "",
   "max_version": "",
   "cipher_suites": [],
-  "certificate": "",
+  "certificate": [],
   "certificate_path": "",
   "ech": {
     "enabled": false,
     "pq_signature_schemes_enabled": false,
     "dynamic_record_sizing_disabled": false,
-    "config": ""
+    "config": [],
+    "config_path": ""
   },
   "utls": {
     "enabled": false,
@@ -162,7 +171,7 @@ TLS 版本值：
 
 #### certificate
 
-服务器 PEM 证书。
+服务器 PEM 证书行数组。
 
 #### certificate_path
 
@@ -172,26 +181,13 @@ TLS 版本值：
 
 ==仅服务器==
 
-服务器 PEM 私钥。
+服务器 PEM 私钥行数组。
 
 #### key_path
 
 ==仅服务器==
 
 服务器 PEM 私钥路径。
-
-#### ech
-
-==仅客户端==
-
-!!! warning ""
-
-    默认安装不包含 ECH, 参阅 [安装](/zh/#_2)。
-
-ECH (Encrypted Client Hello) 是一个 TLS 扩展，它允许客户端加密其 ClientHello 的第一部分
-信息。
-
-如果您不知道如何填写其他配置，只需设置 `enabled` 即可。
 
 #### utls
 
@@ -221,6 +217,59 @@ uTLS 是 "crypto/tls" 的一个分支，它提供了 ClientHello 指纹识别阻
 * randomized
 
 默认使用 chrome 指纹。
+
+## ECH 字段
+
+!!! warning ""
+
+    默认安装不包含 ECH, 参阅 [安装](/zh/#_2)。
+
+ECH (Encrypted Client Hello) 是一个 TLS 扩展，它允许客户端加密其 ClientHello 的第一部分
+信息。
+
+
+ECH 配置和密钥可以通过 `sing-box generate ech-keypair [--pq-signature-schemes-enabled]` 生成。
+
+#### pq_signature_schemes_enabled
+
+启用对后量子对等证书签名方案的支持。
+
+建议匹配 `sing-box generate ech-keypair` 的参数。
+
+#### dynamic_record_sizing_disabled
+
+禁用 TLS 记录的自适应大小调整。
+
+如果为 true，则始终使用最大可能的 TLS 记录大小。
+如果为 false，则可能会调整 TLS 记录的大小以尝试改善延迟。
+
+#### key
+
+==仅服务器==
+
+ECH PEM 密钥行数组
+
+#### key_path
+
+==仅服务器==
+
+ECH PEM 密钥路径
+
+#### config
+
+==仅客户端==
+
+ECH PEM 配置行数组
+
+如果为空，将尝试从 DNS 加载。
+
+#### config_path
+
+==仅客户端==
+
+ECH PEM 配置路径
+
+如果为空，将尝试从 DNS 加载。
 
 ### ACME 字段
 
@@ -290,6 +339,12 @@ EAB（外部帐户绑定）包含将 ACME 帐户绑定或映射到其他已知�
 #### external_account.mac_key
 
 MAC 密钥。
+
+#### dns01_challenge
+
+ACME DNS01 验证字段。如果配置，将禁用其他验证方法。
+
+参阅 [DNS01 验证字段](/configuration/shared/dns01_challenge)。
 
 ### Reality 字段
 

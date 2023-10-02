@@ -61,7 +61,7 @@ func NewVLESS(ctx context.Context, router adapter.Router, logger log.ContextLogg
 	inbound.service = service
 	var err error
 	if options.TLS != nil {
-		inbound.tlsConfig, err = tls.NewServer(ctx, router, logger, common.PtrValueOrDefault(options.TLS))
+		inbound.tlsConfig, err = tls.NewServer(ctx, logger, common.PtrValueOrDefault(options.TLS))
 		if err != nil {
 			return nil, err
 		}
@@ -188,8 +188,4 @@ func (t *vlessTransportHandler) NewConnection(ctx context.Context, conn net.Conn
 		Source:      metadata.Source,
 		Destination: metadata.Destination,
 	})
-}
-
-func (t *vlessTransportHandler) FallbackConnection(ctx context.Context, conn net.Conn, metadata M.Metadata) error {
-	return os.ErrInvalid
 }

@@ -27,10 +27,10 @@ func New(ctx context.Context, router adapter.Router, logger log.ContextLogger, t
 		return NewBlock(logger, tag), nil
 	case C.TypeDNS:
 		return NewDNS(router, tag), nil
-	case C.TypeSocks:
+	case C.TypeSOCKS:
 		return NewSocks(router, logger, tag, options.SocksOptions)
 	case C.TypeHTTP:
-		return NewHTTP(router, logger, tag, options.HTTPOptions)
+		return NewHTTP(ctx, router, logger, tag, options.HTTPOptions)
 	case C.TypeShadowsocks:
 		return NewShadowsocks(ctx, router, logger, tag, options.ShadowsocksOptions)
 	case C.TypeVMess:
@@ -51,6 +51,10 @@ func New(ctx context.Context, router adapter.Router, logger log.ContextLogger, t
 		return NewShadowsocksR(ctx, router, logger, tag, options.ShadowsocksROptions)
 	case C.TypeVLESS:
 		return NewVLESS(ctx, router, logger, tag, options.VLESSOptions)
+	case C.TypeTUIC:
+		return NewTUIC(ctx, router, logger, tag, options.TUICOptions)
+	case C.TypeHysteria2:
+		return NewHysteria2(ctx, router, logger, tag, options.Hysteria2Options)
 	case C.TypeSelector:
 		return NewSelector(router, logger, tag, options.SelectorOptions)
 	case C.TypeURLTest:

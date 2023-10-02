@@ -47,7 +47,7 @@ func NewShadowTLS(ctx context.Context, router adapter.Router, logger log.Context
 		options.TLS.MinVersion = "1.2"
 		options.TLS.MaxVersion = "1.2"
 	}
-	tlsConfig, err := tls.NewClient(router, options.Server, common.PtrValueOrDefault(options.TLS))
+	tlsConfig, err := tls.NewClient(ctx, options.Server, common.PtrValueOrDefault(options.TLS))
 	if err != nil {
 		return nil, err
 	}
@@ -72,11 +72,15 @@ func NewShadowTLS(ctx context.Context, router adapter.Router, logger log.Context
 			tlsHandshakeFunc = shadowtls.DefaultTLSHandshakeFunc(options.Password, stdTLSConfig)
 		}
 	}
+	outboundDialer, err := dialer.New(router, options.DialerOptions)
+	if err != nil {
+		return nil, err
+	}
 	client, err := shadowtls.NewClient(shadowtls.ClientConfig{
 		Version:      options.Version,
 		Password:     options.Password,
 		Server:       options.ServerOptions.Build(),
-		Dialer:       dialer.New(router, options.DialerOptions),
+		Dialer:       outboundDialer,
 		TLSHandshake: tlsHandshakeFunc,
 		Logger:       logger,
 	})

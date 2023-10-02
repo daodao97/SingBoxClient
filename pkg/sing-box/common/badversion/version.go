@@ -11,6 +11,7 @@ type Version struct {
 	Major                int
 	Minor                int
 	Patch                int
+	Commit               string
 	PreReleaseIdentifier string
 	PreReleaseVersion    int
 }
@@ -37,18 +38,27 @@ func (v Version) After(anotherVersion Version) bool {
 		return false
 	}
 	if v.PreReleaseIdentifier != "" && anotherVersion.PreReleaseIdentifier != "" {
-		if v.PreReleaseIdentifier == "beta" && anotherVersion.PreReleaseIdentifier == "alpha" {
+		if v.PreReleaseIdentifier == anotherVersion.PreReleaseIdentifier {
+			if v.PreReleaseVersion > anotherVersion.PreReleaseVersion {
+				return true
+			} else if v.PreReleaseVersion < anotherVersion.PreReleaseVersion {
+				return false
+			}
+		} else if v.PreReleaseIdentifier == "rc" && anotherVersion.PreReleaseIdentifier == "beta" {
+			return true
+		} else if v.PreReleaseIdentifier == "beta" && anotherVersion.PreReleaseIdentifier == "rc" {
+			return false
+		} else if v.PreReleaseIdentifier == "beta" && anotherVersion.PreReleaseIdentifier == "alpha" {
 			return true
 		} else if v.PreReleaseIdentifier == "alpha" && anotherVersion.PreReleaseIdentifier == "beta" {
 			return false
 		}
-		if v.PreReleaseVersion > anotherVersion.PreReleaseVersion {
-			return true
-		} else if v.PreReleaseVersion < anotherVersion.PreReleaseVersion {
-			return false
-		}
 	}
 	return false
+}
+
+func (v Version) VersionString() string {
+	return F.ToString(v.Major, ".", v.Minor, ".", v.Patch)
 }
 
 func (v Version) String() string {
@@ -95,7 +105,7 @@ func Parse(versionName string) (version Version) {
 				version.PreReleaseIdentifier = "beta"
 				version.PreReleaseVersion, _ = strconv.Atoi(identifier[4:])
 			} else {
-				version.PreReleaseIdentifier = identifier
+				version.Commit = identifier
 			}
 		}
 	}

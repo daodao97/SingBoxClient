@@ -10,6 +10,7 @@ import (
 	"github.com/sagernet/sing-tun"
 	"github.com/sagernet/sing/common/control"
 	N "github.com/sagernet/sing/common/network"
+	"github.com/sagernet/sing/service"
 
 	mdns "github.com/miekg/dns"
 )
@@ -32,6 +33,7 @@ type Router interface {
 	Exchange(ctx context.Context, message *mdns.Msg) (*mdns.Msg, error)
 	Lookup(ctx context.Context, domain string, strategy dns.DomainStrategy) ([]netip.Addr, error)
 	LookupDefault(ctx context.Context, domain string) ([]netip.Addr, error)
+	ClearDNSCache()
 
 	InterfaceFinder() control.InterfaceFinder
 	UpdateInterfaces() error
@@ -44,8 +46,6 @@ type Router interface {
 	PackageManager() tun.PackageManager
 	Rules() []Rule
 
-	TimeService
-
 	ClashServer() ClashServer
 	SetClashServer(server ClashServer)
 
@@ -55,18 +55,12 @@ type Router interface {
 	ResetNetwork() error
 }
 
-type routerContextKey struct{}
-
 func ContextWithRouter(ctx context.Context, router Router) context.Context {
-	return context.WithValue(ctx, (*routerContextKey)(nil), router)
+	return service.ContextWith(ctx, router)
 }
 
 func RouterFromContext(ctx context.Context) Router {
-	metadata := ctx.Value((*routerContextKey)(nil))
-	if metadata == nil {
-		return nil
-	}
-	return metadata.(Router)
+	return service.FromContext[Router](ctx)
 }
 
 type Rule interface {
@@ -85,5 +79,5 @@ type DNSRule interface {
 }
 
 type InterfaceUpdateListener interface {
-	InterfaceUpdated() error
+	InterfaceUpdated()
 }

@@ -5,8 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/sagernet/sing-box/common/baderror"
 	"github.com/sagernet/sing/common"
+	"github.com/sagernet/sing/common/baderror"
+	M "github.com/sagernet/sing/common/metadata"
 	"github.com/sagernet/sing/common/rw"
 )
 
@@ -62,11 +63,11 @@ func (c *GRPCConn) Close() error {
 }
 
 func (c *GRPCConn) LocalAddr() net.Addr {
-	return nil
+	return M.Socksaddr{}
 }
 
 func (c *GRPCConn) RemoteAddr() net.Addr {
-	return nil
+	return M.Socksaddr{}
 }
 
 func (c *GRPCConn) SetDeadline(t time.Time) error {

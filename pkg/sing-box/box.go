@@ -19,6 +19,8 @@ import (
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
 	F "github.com/sagernet/sing/common/format"
+	"github.com/sagernet/sing/service"
+	"github.com/sagernet/sing/service/pause"
 )
 
 var _ adapter.Service = (*Box)(nil)
@@ -46,12 +48,14 @@ func New(options Options) (*Box, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx = service.ContextWithDefaultRegistry(ctx)
+	ctx = pause.ContextWithDefaultManager(ctx)
 	createdAt := time.Now()
 	experimentalOptions := common.PtrValueOrDefault(options.Experimental)
 	applyDebugOptions(common.PtrValueOrDefault(experimentalOptions.Debug))
 	var needClashAPI bool
 	var needV2RayAPI bool
-	if experimentalOptions.ClashAPI != nil && experimentalOptions.ClashAPI.ExternalController != "" {
+	if experimentalOptions.ClashAPI != nil || options.PlatformInterface != nil {
 		needClashAPI = true
 	}
 	if experimentalOptions.V2RayAPI != nil && experimentalOptions.V2RayAPI.Listen != "" {
@@ -143,7 +147,9 @@ func New(options Options) (*Box, error) {
 	preServices := make(map[string]adapter.Service)
 	postServices := make(map[string]adapter.Service)
 	if needClashAPI {
-		clashServer, err := experimental.NewClashServer(ctx, router, logFactory.(log.ObservableFactory), common.PtrValueOrDefault(options.Experimental.ClashAPI))
+		clashAPIOptions := common.PtrValueOrDefault(experimentalOptions.ClashAPI)
+		clashAPIOptions.ModeList = experimental.CalculateClashModeList(options.Options)
+		clashServer, err := experimental.NewClashServer(ctx, router, logFactory.(log.ObservableFactory), clashAPIOptions)
 		if err != nil {
 			return nil, E.Cause(err, "create clash api server")
 		}
@@ -151,7 +157,7 @@ func New(options Options) (*Box, error) {
 		preServices["clash api"] = clashServer
 	}
 	if needV2RayAPI {
-		v2rayServer, err := experimental.NewV2RayServer(logFactory.NewLogger("v2ray-api"), common.PtrValueOrDefault(options.Experimental.V2RayAPI))
+		v2rayServer, err := experimental.NewV2RayServer(logFactory.NewLogger("v2ray-api"), common.PtrValueOrDefault(experimentalOptions.V2RayAPI))
 		if err != nil {
 			return nil, E.Cause(err, "create v2ray api server")
 		}

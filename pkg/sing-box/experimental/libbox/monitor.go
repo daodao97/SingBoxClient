@@ -1,7 +1,6 @@
 package libbox
 
 import (
-	"context"
 	"net"
 	"net/netip"
 	"sync"
@@ -9,6 +8,7 @@ import (
 	"github.com/sagernet/sing-tun"
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/sagernet/sing/common/logger"
 	M "github.com/sagernet/sing/common/metadata"
 	"github.com/sagernet/sing/common/x/list"
 )
@@ -20,13 +20,13 @@ var (
 
 type platformDefaultInterfaceMonitor struct {
 	*platformInterfaceWrapper
-	errorHandler          E.Handler
 	networkAddresses      []networkAddress
 	defaultInterfaceName  string
 	defaultInterfaceIndex int
 	element               *list.Element[tun.NetworkUpdateCallback]
 	access                sync.Mutex
 	callbacks             list.List[tun.DefaultInterfaceUpdateCallback]
+	logger                logger.Logger
 }
 
 type networkAddress struct {
@@ -65,6 +65,17 @@ func (m *platformDefaultInterfaceMonitor) DefaultInterfaceIndex(destination neti
 	return m.defaultInterfaceIndex
 }
 
+func (m *platformDefaultInterfaceMonitor) DefaultInterface(destination netip.Addr) (string, int) {
+	for _, address := range m.networkAddresses {
+		for _, prefix := range address.addresses {
+			if prefix.Contains(destination) {
+				return address.interfaceName, address.interfaceIndex
+			}
+		}
+	}
+	return m.defaultInterfaceName, m.defaultInterfaceIndex
+}
+
 func (m *platformDefaultInterfaceMonitor) OverrideAndroidVPN() bool {
 	return false
 }
@@ -96,7 +107,7 @@ func (m *platformDefaultInterfaceMonitor) UpdateDefaultInterface(interfaceName s
 		err = m.router.UpdateInterfaces()
 	}
 	if err != nil {
-		m.errorHandler.NewError(context.Background(), E.Cause(err, "update interfaces"))
+		m.logger.Error(E.Cause(err, "update interfaces"))
 	}
 	interfaceIndex := int(interfaceIndex32)
 	if interfaceName == "" {
@@ -115,10 +126,10 @@ func (m *platformDefaultInterfaceMonitor) UpdateDefaultInterface(interfaceName s
 		}
 	}
 	if interfaceName == "" {
-		m.errorHandler.NewError(context.Background(), E.New("invalid interface name for ", interfaceIndex))
+		m.logger.Error(E.New("invalid interface name for ", interfaceIndex))
 		return
 	} else if interfaceIndex == -1 {
-		m.errorHandler.NewError(context.Background(), E.New("invalid interface index for ", interfaceName))
+		m.logger.Error(E.New("invalid interface index for ", interfaceName))
 		return
 	}
 	if m.defaultInterfaceName == interfaceName && m.defaultInterfaceIndex == interfaceIndex {
@@ -130,10 +141,7 @@ func (m *platformDefaultInterfaceMonitor) UpdateDefaultInterface(interfaceName s
 	callbacks := m.callbacks.Array()
 	m.access.Unlock()
 	for _, callback := range callbacks {
-		err = callback(tun.EventInterfaceUpdate)
-		if err != nil {
-			m.errorHandler.NewError(context.Background(), err)
-		}
+		callback(tun.EventInterfaceUpdate)
 	}
 }
 

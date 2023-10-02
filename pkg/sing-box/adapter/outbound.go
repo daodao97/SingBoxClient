@@ -22,3 +22,4 @@ type Outbound interface {
 type Delay interface {
 	Delay() (uint16, error)
 }
+

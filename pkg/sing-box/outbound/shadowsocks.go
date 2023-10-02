@@ -39,6 +39,10 @@ func NewShadowsocks(ctx context.Context, router adapter.Router, logger log.Conte
 	if err != nil {
 		return nil, err
 	}
+	outboundDialer, err := dialer.New(router, options.DialerOptions)
+	if err != nil {
+		return nil, err
+	}
 	outbound := &Shadowsocks{
 		myOutboundAdapter: myOutboundAdapter{
 			protocol:     C.TypeShadowsocks,
@@ -48,12 +52,12 @@ func NewShadowsocks(ctx context.Context, router adapter.Router, logger log.Conte
 			tag:          tag,
 			dependencies: withDialerDependency(options.DialerOptions),
 		},
-		dialer:     dialer.New(router, options.DialerOptions),
+		dialer:     outboundDialer,
 		method:     method,
 		serverAddr: options.ServerOptions.Build(),
 	}
 	if options.Plugin != "" {
-		outbound.plugin, err = sip003.CreatePlugin(options.Plugin, options.PluginOptions, router, outbound.dialer, outbound.serverAddr)
+		outbound.plugin, err = sip003.CreatePlugin(ctx, options.Plugin, options.PluginOptions, router, outbound.dialer, outbound.serverAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -129,11 +133,11 @@ func (h *Shadowsocks) NewPacketConnection(ctx context.Context, conn N.PacketConn
 	return NewPacketConnection(ctx, h, conn, metadata)
 }
 
-func (h *Shadowsocks) InterfaceUpdated() error {
+func (h *Shadowsocks) InterfaceUpdated() {
 	if h.multiplexDialer != nil {
 		h.multiplexDialer.Reset()
 	}
-	return nil
+	return
 }
 
 func (h *Shadowsocks) Close() error {

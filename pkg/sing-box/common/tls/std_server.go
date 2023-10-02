@@ -5,12 +5,14 @@ import (
 	"crypto/tls"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/sagernet/sing/common/ntp"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -156,7 +158,7 @@ func (c *STDServerConfig) Close() error {
 	return nil
 }
 
-func NewSTDServer(ctx context.Context, router adapter.Router, logger log.Logger, options option.InboundTLSOptions) (ServerConfig, error) {
+func NewSTDServer(ctx context.Context, logger log.Logger, options option.InboundTLSOptions) (ServerConfig, error) {
 	if !options.Enabled {
 		return nil, nil
 	}
@@ -164,8 +166,8 @@ func NewSTDServer(ctx context.Context, router adapter.Router, logger log.Logger,
 	var acmeService adapter.Service
 	var err error
 	if options.ACME != nil && len(options.ACME.Domain) > 0 {
-		tlsConfig, acmeService, err = startACME(ctx, common.PtrValueOrDefault(options.ACME))
 		//nolint:staticcheck
+		tlsConfig, acmeService, err = startACME(ctx, common.PtrValueOrDefault(options.ACME))
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +177,7 @@ func NewSTDServer(ctx context.Context, router adapter.Router, logger log.Logger,
 	} else {
 		tlsConfig = &tls.Config{}
 	}
-	tlsConfig.Time = router.TimeFunc()
+	tlsConfig.Time = ntp.TimeFuncFromContext(ctx)
 	if options.ServerName != "" {
 		tlsConfig.ServerName = options.ServerName
 	}
@@ -211,8 +213,8 @@ func NewSTDServer(ctx context.Context, router adapter.Router, logger log.Logger,
 	var certificate []byte
 	var key []byte
 	if acmeService == nil {
-		if options.Certificate != "" {
-			certificate = []byte(options.Certificate)
+		if len(options.Certificate) > 0 {
+			certificate = []byte(strings.Join(options.Certificate, "\n"))
 		} else if options.CertificatePath != "" {
 			content, err := os.ReadFile(options.CertificatePath)
 			if err != nil {
@@ -220,8 +222,8 @@ func NewSTDServer(ctx context.Context, router adapter.Router, logger log.Logger,
 			}
 			certificate = content
 		}
-		if options.Key != "" {
-			key = []byte(options.Key)
+		if len(options.Key) > 0 {
+			key = []byte(strings.Join(options.Key, "\n"))
 		} else if options.KeyPath != "" {
 			content, err := os.ReadFile(options.KeyPath)
 			if err != nil {
@@ -231,7 +233,7 @@ func NewSTDServer(ctx context.Context, router adapter.Router, logger log.Logger,
 		}
 		if certificate == nil && key == nil && options.Insecure {
 			tlsConfig.GetCertificate = func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-				return GenerateKeyPair(router.TimeFunc(), info.ServerName)
+				return GenerateKeyPair(ntp.TimeFuncFromContext(ctx), info.ServerName)
 			}
 		} else {
 			if certificate == nil {

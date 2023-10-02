@@ -3,7 +3,9 @@ package libbox
 import (
 	"encoding/binary"
 	"net"
+	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -26,13 +28,15 @@ type CommandClientHandler interface {
 	WriteLog(message string)
 	WriteStatus(message *StatusMessage)
 	WriteGroups(message OutboundGroupIterator)
+	InitializeClashMode(modeList StringIterator, currentMode string)
+	UpdateClashMode(newMode string)
 }
 
 func NewStandaloneCommandClient() *CommandClient {
 	return new(CommandClient)
 }
 
-func NewCommandClient(sharedDirectory string, handler CommandClientHandler, options *CommandClientOptions) *CommandClient {
+func NewCommandClient(handler CommandClientHandler, options *CommandClientOptions) *CommandClient {
 	return &CommandClient{
 		handler: handler,
 		options: common.PtrValueOrDefault(options),
@@ -50,9 +54,24 @@ func (c *CommandClient) directConnect() (net.Conn, error) {
 	}
 }
 
+func (c *CommandClient) directConnectWithRetry() (net.Conn, error) {
+	var (
+		conn net.Conn
+		err  error
+	)
+	for i := 0; i < 10; i++ {
+		conn, err = c.directConnect()
+		if err == nil {
+			return conn, nil
+		}
+		time.Sleep(time.Duration(100+i*50) * time.Millisecond)
+	}
+	return nil, err
+}
+
 func (c *CommandClient) Connect() error {
 	common.Close(c.conn)
-	conn, err := c.directConnect()
+	conn, err := c.directConnectWithRetry()
 	if err != nil {
 		return err
 	}
@@ -79,6 +98,23 @@ func (c *CommandClient) Connect() error {
 		}
 		c.handler.Connected()
 		go c.handleGroupConn(conn)
+	case CommandClashMode:
+		var (
+			modeList    []string
+			currentMode string
+		)
+		modeList, currentMode, err = readClashModeList(conn)
+		if err != nil {
+			return err
+		}
+		c.handler.Connected()
+		c.handler.InitializeClashMode(newIterator(modeList), currentMode)
+		if len(modeList) == 0 {
+			conn.Close()
+			c.handler.Disconnected(os.ErrInvalid.Error())
+			return nil
+		}
+		go c.handleModeConn(conn)
 	}
 	return nil
 }

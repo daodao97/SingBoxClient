@@ -24,6 +24,12 @@
   ],
   "endpoint_independent_nat": false,
   "stack": "system",
+  "include_interface": [
+    "lan0"
+  ],
+  "exclude_interface": [
+    "lan1"
+  ],
   "include_uid": [
     0
   ],
@@ -142,15 +148,32 @@ UDP NAT expiration time in seconds, default is 300 (5 minutes).
 
 TCP/IP stack.
 
-| Stack            | Description                                                                      | Status            |
-|------------------|----------------------------------------------------------------------------------|-------------------|
-| system (default) | Sometimes better performance                                                     | recommended       |
-| gVisor           | Better compatibility, based on [google/gvisor](https://github.com/google/gvisor) | recommended       |
-| LWIP             | Based on [eycorsican/go-tun2socks](https://github.com/eycorsican/go-tun2socks)   | upstream archived |
+| Stack  | Description                                                                      | Status            |
+|--------|----------------------------------------------------------------------------------|-------------------|
+| system | Sometimes better performance                                                     | recommended       |
+| gVisor | Better compatibility, based on [google/gvisor](https://github.com/google/gvisor) | recommended       |
+| mixed  | Mixed `system` TCP stack and `gVisor` UDP stack                                  | recommended       |
+| LWIP   | Based on [eycorsican/go-tun2socks](https://github.com/eycorsican/go-tun2socks)   | upstream archived |
 
 !!! warning ""
 
     gVisor and LWIP stacks is not included by default, see [Installation](/#installation).
+
+#### include_interface
+
+!!! error ""
+
+    Interface rules are only supported on Linux and require auto_route.
+
+Limit interfaces in route. Not limited by default.
+
+Conflict with `exclude_interface`.
+
+#### exclude_interface
+
+Exclude interfaces in route.
+
+Conflict with `include_interface`.
 
 #### include_uid
 

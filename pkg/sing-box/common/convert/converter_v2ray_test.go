@@ -2,9 +2,8 @@ package convert
 
 import (
 	"fmt"
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestConvertsV2Ray(t *testing.T) {

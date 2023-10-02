@@ -60,7 +60,7 @@ func NewNaive(ctx context.Context, router adapter.Router, logger log.ContextLogg
 		return nil, E.New("missing users")
 	}
 	if options.TLS != nil {
-		tlsConfig, err := tls.NewServer(ctx, router, logger, common.PtrValueOrDefault(options.TLS))
+		tlsConfig, err := tls.NewServer(ctx, logger, common.PtrValueOrDefault(options.TLS))
 		if err != nil {
 			return nil, err
 		}
@@ -582,7 +582,7 @@ func (c *naiveH2Conn) Close() error {
 }
 
 func (c *naiveH2Conn) LocalAddr() net.Addr {
-	return nil
+	return M.Socksaddr{}
 }
 
 func (c *naiveH2Conn) RemoteAddr() net.Addr {

@@ -394,7 +394,7 @@ func (c *Conn) Read(p []byte) (n int, err error) {
 }
 
 func (c *Conn) LocalAddr() net.Addr {
-	return nil
+	return M.Socksaddr{}
 }
 
 func (c *Conn) RemoteAddr() net.Addr {
@@ -502,7 +502,7 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 }
 
 func (c *PacketConn) LocalAddr() net.Addr {
-	return nil
+	return M.Socksaddr{}
 }
 
 func (c *PacketConn) RemoteAddr() net.Addr {
@@ -526,11 +526,12 @@ func (c *PacketConn) NeedAdditionalReadDeadline() bool {
 }
 
 func (c *PacketConn) Read(b []byte) (n int, err error) {
-	return 0, os.ErrInvalid
+	n, _, err = c.ReadFrom(b)
+	return
 }
 
 func (c *PacketConn) Write(b []byte) (n int, err error) {
-	return 0, os.ErrInvalid
+	return c.WriteTo(b, c.destination)
 }
 
 func (c *PacketConn) Close() error {

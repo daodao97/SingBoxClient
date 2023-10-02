@@ -3,6 +3,7 @@ package libbox
 import (
 	"context"
 	"net/netip"
+	runtimeDebug "runtime/debug"
 	"syscall"
 
 	"github.com/sagernet/sing-box"
@@ -16,15 +17,19 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/control"
 	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/sagernet/sing/common/logger"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/service"
 	"github.com/sagernet/sing/service/filemanager"
+	"github.com/sagernet/sing/service/pause"
 )
 
 type BoxService struct {
-	ctx      context.Context
-	cancel   context.CancelFunc
-	instance *box.Box
+	ctx                   context.Context
+	cancel                context.CancelFunc
+	instance              *box.Box
+	pauseManager          pause.Manager
+	urlTestHistoryStorage *urltest.HistoryStorage
 }
 
 func NewService(configContent string, platformInterface PlatformInterface) (*BoxService, error) {
@@ -32,9 +37,13 @@ func NewService(configContent string, platformInterface PlatformInterface) (*Box
 	if err != nil {
 		return nil, err
 	}
+	runtimeDebug.FreeOSMemory()
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = filemanager.WithDefault(ctx, sWorkingPath, sTempPath, sUserID, sGroupID)
-	ctx = service.ContextWithPtr(ctx, urltest.NewHistoryStorage())
+	urlTestHistoryStorage := urltest.NewHistoryStorage()
+	ctx = service.ContextWithPtr(ctx, urlTestHistoryStorage)
+	pauseManager := pause.NewDefaultManager(ctx)
+	ctx = pause.ContextWithManager(ctx, pauseManager)
 	instance, err := box.New(box.Options{
 		Context:           ctx,
 		Options:           options,
@@ -44,10 +53,13 @@ func NewService(configContent string, platformInterface PlatformInterface) (*Box
 		cancel()
 		return nil, E.Cause(err, "create service")
 	}
+	runtimeDebug.FreeOSMemory()
 	return &BoxService{
-		ctx:      ctx,
-		cancel:   cancel,
-		instance: instance,
+		ctx:                   ctx,
+		cancel:                cancel,
+		instance:              instance,
+		urlTestHistoryStorage: urlTestHistoryStorage,
+		pauseManager:          pauseManager,
 	}, nil
 }
 
@@ -57,7 +69,17 @@ func (s *BoxService) Start() error {
 
 func (s *BoxService) Close() error {
 	s.cancel()
+	s.urlTestHistoryStorage.Close()
 	return s.instance.Close()
+}
+
+func (s *BoxService) Sleep() {
+	s.pauseManager.DevicePause()
+	_ = s.instance.Router().ResetNetwork()
+}
+
+func (s *BoxService) Wake() {
+	s.pauseManager.DeviceWake()
 }
 
 var _ platform.Interface = (*platformInterfaceWrapper)(nil)
@@ -144,11 +166,11 @@ func (w *platformInterfaceWrapper) UsePlatformDefaultInterfaceMonitor() bool {
 	return w.iif.UsePlatformDefaultInterfaceMonitor()
 }
 
-func (w *platformInterfaceWrapper) CreateDefaultInterfaceMonitor(errorHandler E.Handler) tun.DefaultInterfaceMonitor {
+func (w *platformInterfaceWrapper) CreateDefaultInterfaceMonitor(logger logger.Logger) tun.DefaultInterfaceMonitor {
 	return &platformDefaultInterfaceMonitor{
 		platformInterfaceWrapper: w,
-		errorHandler:             errorHandler,
 		defaultInterfaceIndex:    -1,
+		logger:                   logger,
 	}
 }
 
@@ -175,4 +197,8 @@ func (w *platformInterfaceWrapper) Interfaces() ([]platform.NetworkInterface, er
 
 func (w *platformInterfaceWrapper) UnderNetworkExtension() bool {
 	return w.iif.UnderNetworkExtension()
+}
+
+func (w *platformInterfaceWrapper) ClearDNSCache() {
+	w.iif.ClearDNSCache()
 }

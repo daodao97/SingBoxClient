@@ -8,4 +8,9 @@ const (
 	CommandGroup
 	CommandSelectOutbound
 	CommandURLTest
+	CommandGroupExpand
+	CommandClashMode
+	CommandSetClashMode
+	CommandGetSystemProxyStatus
+	CommandSetSystemProxyEnabled
 )

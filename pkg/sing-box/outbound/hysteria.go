@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/sagernet/quic-go"
-	"github.com/sagernet/quic-go/congestion"
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/dialer"
 	"github.com/sagernet/sing-box/common/tls"
@@ -16,6 +15,8 @@ import (
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-box/transport/hysteria"
+	"github.com/sagernet/sing-quic"
+	hyCC "github.com/sagernet/sing-quic/hysteria2/congestion"
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/bufio"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -33,7 +34,7 @@ type Hysteria struct {
 	ctx          context.Context
 	dialer       N.Dialer
 	serverAddr   M.Socksaddr
-	tlsConfig    *tls.STDConfig
+	tlsConfig    tls.Config
 	quicConfig   *quic.Config
 	authKey      []byte
 	xplusKey     []byte
@@ -52,17 +53,12 @@ func NewHysteria(ctx context.Context, router adapter.Router, logger log.ContextL
 	if options.TLS == nil || !options.TLS.Enabled {
 		return nil, C.ErrTLSRequired
 	}
-	abstractTLSConfig, err := tls.NewClient(router, options.Server, common.PtrValueOrDefault(options.TLS))
+	tlsConfig, err := tls.NewClient(ctx, options.Server, common.PtrValueOrDefault(options.TLS))
 	if err != nil {
 		return nil, err
 	}
-	tlsConfig, err := abstractTLSConfig.Config()
-	if err != nil {
-		return nil, err
-	}
-	tlsConfig.MinVersion = tls.VersionTLS13
-	if len(tlsConfig.NextProtos) == 0 {
-		tlsConfig.NextProtos = []string{hysteria.DefaultALPN}
+	if len(tlsConfig.NextProtos()) == 0 {
+		tlsConfig.SetNextProtos([]string{hysteria.DefaultALPN})
 	}
 	quicConfig := &quic.Config{
 		InitialStreamReceiveWindow:     options.ReceiveWindowConn,
@@ -117,6 +113,10 @@ func NewHysteria(ctx context.Context, router adapter.Router, logger log.ContextL
 	if down < hysteria.MinSpeedBPS {
 		return nil, E.New("invalid down speed")
 	}
+	outboundDialer, err := dialer.New(router, options.DialerOptions)
+	if err != nil {
+		return nil, err
+	}
 	return &Hysteria{
 		myOutboundAdapter: myOutboundAdapter{
 			protocol:     C.TypeHysteria,
@@ -127,7 +127,7 @@ func NewHysteria(ctx context.Context, router adapter.Router, logger log.ContextL
 			dependencies: withDialerDependency(options.DialerOptions),
 		},
 		ctx:        ctx,
-		dialer:     dialer.New(router, options.DialerOptions),
+		dialer:     outboundDialer,
 		serverAddr: options.ServerOptions.Build(),
 		tlsConfig:  tlsConfig,
 		quicConfig: quicConfig,
@@ -178,7 +178,7 @@ func (h *Hysteria) offerNew(ctx context.Context) (quic.Connection, error) {
 		packetConn = hysteria.NewXPlusPacketConn(packetConn, h.xplusKey)
 	}
 	packetConn = &hysteria.PacketConnWrapper{PacketConn: packetConn}
-	quicConn, err := quic.Dial(h.ctx, packetConn, udpConn.RemoteAddr(), h.tlsConfig, h.quicConfig)
+	quicConn, err := qtls.Dial(h.ctx, packetConn, udpConn.RemoteAddr(), h.tlsConfig, h.quicConfig)
 	if err != nil {
 		packetConn.Close()
 		return nil, err
@@ -206,7 +206,7 @@ func (h *Hysteria) offerNew(ctx context.Context) (quic.Connection, error) {
 		packetConn.Close()
 		return nil, E.New("remote error: ", serverHello.Message)
 	}
-	quicConn.SetCongestionControl(hysteria.NewBrutalSender(congestion.ByteCount(serverHello.RecvBPS)))
+	quicConn.SetCongestionControl(hyCC.NewBrutalSender(serverHello.RecvBPS))
 	h.conn = quicConn
 	h.rawConn = udpConn
 	return quicConn, nil
@@ -214,7 +214,7 @@ func (h *Hysteria) offerNew(ctx context.Context) (quic.Connection, error) {
 
 func (h *Hysteria) udpRecvLoop(conn quic.Connection) {
 	for {
-		packet, err := conn.ReceiveMessage()
+		packet, err := conn.ReceiveMessage(h.ctx)
 		if err != nil {
 			return
 		}
@@ -241,9 +241,9 @@ func (h *Hysteria) udpRecvLoop(conn quic.Connection) {
 	}
 }
 
-func (h *Hysteria) InterfaceUpdated() error {
+func (h *Hysteria) InterfaceUpdated() {
 	h.Close()
-	return nil
+	return
 }
 
 func (h *Hysteria) Close() error {

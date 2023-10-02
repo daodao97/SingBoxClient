@@ -19,6 +19,7 @@ import (
 	F "github.com/sagernet/sing/common/format"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
+	"github.com/sagernet/sing/common/ntp"
 )
 
 var (
@@ -50,7 +51,7 @@ func NewVMess(ctx context.Context, router adapter.Router, logger log.ContextLogg
 		users: options.Users,
 	}
 	var serviceOptions []vmess.ServiceOption
-	if timeFunc := router.TimeFunc(); timeFunc != nil {
+	if timeFunc := ntp.TimeFuncFromContext(ctx); timeFunc != nil {
 		serviceOptions = append(serviceOptions, vmess.ServiceWithTimeFunc(timeFunc))
 	}
 	if options.Transport != nil && options.Transport.Type != "" {
@@ -69,7 +70,7 @@ func NewVMess(ctx context.Context, router adapter.Router, logger log.ContextLogg
 		return nil, err
 	}
 	if options.TLS != nil {
-		inbound.tlsConfig, err = tls.NewServer(ctx, router, logger, common.PtrValueOrDefault(options.TLS))
+		inbound.tlsConfig, err = tls.NewServer(ctx, logger, common.PtrValueOrDefault(options.TLS))
 		if err != nil {
 			return nil, err
 		}
@@ -196,8 +197,4 @@ func (t *vmessTransportHandler) NewConnection(ctx context.Context, conn net.Conn
 		Source:      metadata.Source,
 		Destination: metadata.Destination,
 	})
-}
-
-func (t *vmessTransportHandler) FallbackConnection(ctx context.Context, conn net.Conn, metadata M.Metadata) error {
-	return os.ErrInvalid
 }

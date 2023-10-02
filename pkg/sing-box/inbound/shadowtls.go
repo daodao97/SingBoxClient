@@ -11,6 +11,7 @@ import (
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-shadowtls"
 	"github.com/sagernet/sing/common"
+	"github.com/sagernet/sing/common/auth"
 	N "github.com/sagernet/sing/common/network"
 )
 
@@ -40,11 +41,19 @@ func NewShadowTLS(ctx context.Context, router adapter.Router, logger log.Context
 	if options.Version > 1 {
 		handshakeForServerName = make(map[string]shadowtls.HandshakeConfig)
 		for serverName, serverOptions := range options.HandshakeForServerName {
+			handshakeDialer, err := dialer.New(router, serverOptions.DialerOptions)
+			if err != nil {
+				return nil, err
+			}
 			handshakeForServerName[serverName] = shadowtls.HandshakeConfig{
 				Server: serverOptions.ServerOptions.Build(),
-				Dialer: dialer.New(router, serverOptions.DialerOptions),
+				Dialer: handshakeDialer,
 			}
 		}
+	}
+	handshakeDialer, err := dialer.New(router, options.Handshake.DialerOptions)
+	if err != nil {
+		return nil, err
 	}
 	service, err := shadowtls.NewService(shadowtls.ServiceConfig{
 		Version:  options.Version,
@@ -54,11 +63,11 @@ func NewShadowTLS(ctx context.Context, router adapter.Router, logger log.Context
 		}),
 		Handshake: shadowtls.HandshakeConfig{
 			Server: options.Handshake.ServerOptions.Build(),
-			Dialer: dialer.New(router, options.Handshake.DialerOptions),
+			Dialer: handshakeDialer,
 		},
 		HandshakeForServerName: handshakeForServerName,
 		StrictMode:             options.StrictMode,
-		Handler:                inbound.upstreamContextHandler(),
+		Handler:                adapter.NewUpstreamContextHandler(inbound.newConnection, nil, inbound),
 		Logger:                 logger,
 	})
 	if err != nil {
@@ -71,4 +80,14 @@ func NewShadowTLS(ctx context.Context, router adapter.Router, logger log.Context
 
 func (h *ShadowTLS) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext) error {
 	return h.service.NewConnection(adapter.WithContext(log.ContextWithNewID(ctx), &metadata), conn, adapter.UpstreamMetadata(metadata))
+}
+
+func (h *ShadowTLS) newConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext) error {
+	if userName, _ := auth.UserFromContext[string](ctx); userName != "" {
+		metadata.User = userName
+		h.logger.InfoContext(ctx, "[", userName, "] inbound connection to ", metadata.Destination)
+	} else {
+		h.logger.InfoContext(ctx, "inbound connection to ", metadata.Destination)
+	}
+	return h.router.RouteConnection(ctx, conn, metadata)
 }

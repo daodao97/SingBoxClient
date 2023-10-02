@@ -13,9 +13,4 @@
 /*.xcframework/
 .DS_Store
 /config.d/
-
-cmd/sing-box/config.json
-cmd/sing-box/geoip.db
-cmd/sing-box/geosite.db
-cmd/sing-box/provider/
-cmd/sing-box/sing-box
+.conf

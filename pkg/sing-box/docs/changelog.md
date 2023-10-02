@@ -1,3 +1,306 @@
+#### 1.6.0-alpha.1
+
+* Update BBR congestion control for TUIC and Hysteria2 **1**
+* Update quic-go to v0.39.0
+* Update gVisor to 20230814.0
+* Remove [Deprecated Features](/deprecated) by agreement
+* Fixes and improvements
+
+**1**:
+
+None of the existing Golang BBR congestion control implementations have been reviewed or unit tested.
+This update is intended to address the multi-send defects of the old implementation and may introduce new issues.
+
+#### 1.5.0
+
+* Fixes and improvements
+
+Important changes since 1.4:
+
+* Add TLS [ECH server](/configuration/shared/tls) support
+* Improve TLS TCH client configuration
+* Add TLS ECH key pair generator **1**
+* Add TLS ECH support for QUIC based protocols **2**
+* Add KDE support for the `set_system_proxy` option in HTTP inbound
+* Add Hysteria2 protocol support **3**
+* Add `interrupt_exist_connections` option for `Selector` and `URLTest` outbounds **4**
+* Add DNS01 challenge support for ACME TLS certificate issuer **5**
+* Add `merge` command **6**
+* Mark [Deprecated Features](/deprecated)
+
+**1**:
+
+Command: `sing-box generate ech-keypair <plain_server_name> [--pq-signature-schemes-enabled]`
+
+**2**:
+
+All inbounds and outbounds are supported, including `Naiveproxy`, `Hysteria[/2]`, `TUIC` and `V2ray QUIC transport`.
+
+**3**:
+
+See [Hysteria2 inbound](/configuration/inbound/hysteria2) and [Hysteria2 outbound](/configuration/outbound/hysteria2)
+
+For protocol description, please refer to [https://v2.hysteria.network](https://v2.hysteria.network)
+
+**4**:
+
+Interrupt existing connections when the selected outbound has changed.
+
+Only inbound connections are affected by this setting, internal connections will always be interrupted.
+
+**5**:
+
+Only `Alibaba Cloud DNS` and `Cloudflare` are supported, see [ACME Fields](/configuration/shared/tls#acme-fields)
+and [DNS01 Challenge Fields](/configuration/shared/dns01_challenge).
+
+**6**:
+
+This command also parses path resources that appear in the configuration file and replaces them with embedded
+configuration, such as TLS certificates or SSH private keys.
+
+#### 1.5.0-rc.6
+
+* Fixes and improvements
+
+#### 1.4.6
+
+* Fixes and improvements
+
+#### 1.5.0-rc.5
+
+* Fixed an improper authentication vulnerability in the SOCKS5 inbound
+* Fixes and improvements
+
+**Security Advisory**
+
+This update fixes an improper authentication vulnerability in the sing-box SOCKS inbound. This vulnerability allows an
+attacker to craft special requests to bypass user authentication. All users exposing SOCKS servers with user
+authentication in an insecure environment are advised to update immediately.
+
+此更新修复了 sing-box SOCKS 入站中的一个不正确身份验证漏洞。 该漏洞允许攻击者制作特殊请求来绕过用户身份验证。建议所有将使用用户认证的
+SOCKS 服务器暴露在不安全环境下的用户立更新。
+
+#### 1.4.5
+
+* Fixed an improper authentication vulnerability in the SOCKS5 inbound
+* Fixes and improvements
+
+**Security Advisory**
+
+This update fixes an improper authentication vulnerability in the sing-box SOCKS inbound. This vulnerability allows an
+attacker to craft special requests to bypass user authentication. All users exposing SOCKS servers with user
+authentication in an insecure environment are advised to update immediately.
+
+此更新修复了 sing-box SOCKS 入站中的一个不正确身份验证漏洞。 该漏洞允许攻击者制作特殊请求来绕过用户身份验证。建议所有将使用用户认证的
+SOCKS 服务器暴露在不安全环境下的用户立更新。
+
+#### 1.5.0-rc.3
+
+* Fixes and improvements
+
+#### 1.5.0-beta.12
+
+* Add `merge` command **1**
+* Fixes and improvements
+
+**1**:
+
+This command also parses path resources that appear in the configuration file and replaces them with embedded
+configuration, such as TLS certificates or SSH private keys.
+
+```
+Merge configurations
+
+Usage:
+  sing-box merge [output] [flags]
+
+Flags:
+  -h, --help   help for merge
+
+Global Flags:
+  -c, --config stringArray             set configuration file path
+  -C, --config-directory stringArray   set configuration directory path
+  -D, --directory string               set working directory
+      --disable-color                  disable color output
+```
+
+#### 1.5.0-beta.11
+
+* Add DNS01 challenge support for ACME TLS certificate issuer **1**
+* Fixes and improvements
+
+**1**:
+
+Only `Alibaba Cloud DNS` and `Cloudflare` are supported,
+see [ACME Fields](/configuration/shared/tls#acme-fields)
+and [DNS01 Challenge Fields](/configuration/shared/dns01_challenge).
+
+#### 1.5.0-beta.10
+
+* Add `interrupt_exist_connections` option for `Selector` and `URLTest` outbounds **1**
+* Fixes and improvements
+
+**1**:
+
+Interrupt existing connections when the selected outbound has changed.
+
+Only inbound connections are affected by this setting, internal connections will always be interrupted.
+
+#### 1.4.3
+
+* Fixes and improvements
+
+#### 1.5.0-beta.8
+
+* Fixes and improvements
+
+#### 1.4.2
+
+* Fixes and improvements
+
+#### 1.5.0-beta.6
+
+* Fix compatibility issues with official Hysteria2 server and client
+* Fixes and improvements
+* Mark [deprecated features](/deprecated)
+
+#### 1.5.0-beta.3
+
+* Fixes and improvements
+* Updated Hysteria2 documentation **1**
+
+**1**:
+
+Added notes indicating compatibility issues with the official
+Hysteria2 server and client when using `fastOpen=false` or UDP MTU >= 1200.
+
+#### 1.5.0-beta.2
+
+* Add hysteria2 protocol support **1**
+* Fixes and improvements
+
+**1**:
+
+See [Hysteria2 inbound](/configuration/inbound/hysteria2) and [Hysteria2 outbound](/configuration/outbound/hysteria2)
+
+For protocol description, please refer to [https://v2.hysteria.network](https://v2.hysteria.network)
+
+#### 1.5.0-beta.1
+
+* Add TLS [ECH server](/configuration/shared/tls) support
+* Improve TLS TCH client configuration
+* Add TLS ECH key pair generator **1**
+* Add TLS ECH support for QUIC based protocols **2**
+* Add KDE support for the `set_system_proxy` option in HTTP inbound
+
+**1**:
+
+Command: `sing-box generate ech-keypair <plain_server_name> [--pq-signature-schemes-enabled]`
+
+**2**:
+
+All inbounds and outbounds are supported, including `Naiveproxy`, `Hysteria`, `TUIC` and `V2ray QUIC transport`.
+
+#### 1.4.1
+
+* Fixes and improvements
+
+#### 1.4.0
+
+* Fix bugs and update dependencies
+
+Important changes since 1.3:
+
+* Add TUIC support **1**
+* Add `udp_over_stream` option for TUIC client **2**
+* Add MultiPath TCP support **3**
+* Add `include_interface` and `exclude_interface` options for tun inbound
+* Pause recurring tasks when no network or device idle
+* Improve Android and Apple platform clients
+
+*1*:
+
+See [TUIC inbound](/configuration/inbound/tuic)
+and [TUIC outbound](/configuration/outbound/tuic)
+
+**2**:
+
+This is the TUIC port of the [UDP over TCP protocol](/configuration/shared/udp-over-tcp), designed to provide a QUIC
+stream based UDP relay mode that TUIC does not provide. Since it is an add-on protocol, you will need to use sing-box or
+another program compatible with the protocol as a server.
+
+This mode has no positive effect in a proper UDP proxy scenario and should only be applied to relay streaming UDP
+traffic (basically QUIC streams).
+
+*3*:
+
+Requires sing-box to be compiled with Go 1.21.
+
+#### 1.4.0-rc.3
+
+* Fixes and improvements
+
+#### 1.4.0-rc.2
+
+* Fixes and improvements
+
+#### 1.4.0-rc.1
+
+* Fix TUIC UDP
+
+#### 1.4.0-beta.6
+
+* Add `udp_over_stream` option for TUIC client **1**
+* Add `include_interface` and `exclude_interface` options for tun inbound
+* Fixes and improvements
+
+**1**:
+
+This is the TUIC port of the [UDP over TCP protocol](/configuration/shared/udp-over-tcp), designed to provide a QUIC
+stream based UDP relay mode that TUIC does not provide. Since it is an add-on protocol, you will need to use sing-box or
+another program compatible with the protocol as a server.
+
+This mode has no positive effect in a proper UDP proxy scenario and should only be applied to relay streaming UDP
+traffic (basically QUIC streams).
+
+#### 1.4.0-beta.5
+
+* Fixes and improvements
+
+#### 1.4.0-beta.4
+
+* Graphical clients: Persistence group expansion state
+* Fixes and improvements
+
+#### 1.4.0-beta.3
+
+* Fixes and improvements
+
+#### 1.4.0-beta.2
+
+* Add MultiPath TCP support **1**
+* Drop QUIC support for Go 1.18 and 1.19 due to upstream changes
+* Fixes and improvements
+
+*1*:
+
+Requires sing-box to be compiled with Go 1.21.
+
+#### 1.4.0-beta.1
+
+* Add TUIC support **1**
+* Pause recurring tasks when no network or device idle
+* Fixes and improvements
+
+*1*:
+
+See [TUIC inbound](/configuration/inbound/tuic)
+and [TUIC outbound](/configuration/outbound/tuic)
+
+#### 1.3.6
+
+* Fixes and improvements
+
 #### 1.3.5
 
 * Fixes and improvements
@@ -7,13 +310,16 @@
 
 **1**:
 
-Due to the requirement of tvOS 17, the app cannot be submitted to the App Store for the time being, and can only be downloaded through TestFlight.
+Due to the requirement of tvOS 17, the app cannot be submitted to the App Store for the time being, and can only be
+downloaded through TestFlight.
 
 #### 1.3.4
 
 * Fixes and improvements
-* We're now on the [App Store](https://apps.apple.com/us/app/sing-box/id6451272673), always free! It should be noted that due to stricter and slower review, the release of Store versions will be delayed.
-* We've made a standalone version of the macOS client (the original Application Extension relies on App Store distribution), which you can download as SFM-version-universal.zip in the release artifacts.
+* We're now on the [App Store](https://apps.apple.com/us/app/sing-box/id6451272673), always free! It should be noted
+  that due to stricter and slower review, the release of Store versions will be delayed.
+* We've made a standalone version of the macOS client (the original Application Extension relies on App Store
+  distribution), which you can download as SFM-version-universal.zip in the release artifacts.
 
 #### 1.3.3
 

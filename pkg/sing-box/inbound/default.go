@@ -33,8 +33,8 @@ type myInboundAdapter struct {
 
 	// http mixed
 
-	setSystemProxy   bool
-	clearSystemProxy func() error
+	setSystemProxy bool
+	systemProxy    settings.SystemProxy
 
 	// internal
 
@@ -91,10 +91,24 @@ func (a *myInboundAdapter) Start() error {
 		}
 	}
 	if a.setSystemProxy {
-		a.clearSystemProxy, err = settings.SetSystemProxy(a.router, M.SocksaddrFromNet(a.tcpListener.Addr()).Port, a.protocol == C.TypeMixed)
+		listenPort := M.SocksaddrFromNet(a.tcpListener.Addr()).Port
+		var listenAddrString string
+		listenAddr := a.listenOptions.Listen.Build()
+		if listenAddr.IsUnspecified() {
+			listenAddrString = "127.0.0.1"
+		} else {
+			listenAddrString = listenAddr.String()
+		}
+		var systemProxy settings.SystemProxy
+		systemProxy, err = settings.NewSystemProxy(a.ctx, M.ParseSocksaddrHostPort(listenAddrString, listenPort), a.protocol == C.TypeMixed)
+		if err != nil {
+			return E.Cause(err, "initialize system proxy")
+		}
+		err = systemProxy.Enable()
 		if err != nil {
 			return E.Cause(err, "set system proxy")
 		}
+		a.systemProxy = systemProxy
 	}
 	return nil
 }
@@ -102,8 +116,8 @@ func (a *myInboundAdapter) Start() error {
 func (a *myInboundAdapter) Close() error {
 	a.inShutdown.Store(true)
 	var err error
-	if a.clearSystemProxy != nil {
-		err = a.clearSystemProxy()
+	if a.systemProxy != nil && a.systemProxy.IsEnabled() {
+		err = a.systemProxy.Disable()
 	}
 	return E.Errors(err, common.Close(
 		a.tcpListener,
@@ -149,6 +163,17 @@ func (a *myInboundAdapter) createMetadata(conn net.Conn, metadata adapter.Inboun
 	}
 	if tcpConn, isTCP := common.Cast[*net.TCPConn](conn); isTCP {
 		metadata.OriginDestination = M.SocksaddrFromNet(tcpConn.LocalAddr()).Unwrap()
+	}
+	return metadata
+}
+
+func (a *myInboundAdapter) createPacketMetadata(conn N.PacketConn, metadata adapter.InboundContext) adapter.InboundContext {
+	metadata.Inbound = a.tag
+	metadata.InboundType = a.protocol
+	metadata.InboundDetour = a.listenOptions.Detour
+	metadata.InboundOptions = a.listenOptions.InboundOptions
+	if !metadata.Destination.IsValid() {
+		metadata.Destination = M.SocksaddrFromNet(conn.LocalAddr()).Unwrap()
 	}
 	return metadata
 }

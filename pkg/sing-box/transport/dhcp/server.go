@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -85,6 +86,9 @@ func (t *Transport) Start() error {
 	return nil
 }
 
+func (t *Transport) Reset() {
+}
+
 func (t *Transport) Close() error {
 	if t.interfaceCallback != nil {
 		t.router.InterfaceMonitor().UnregisterCallback(t.interfaceCallback)
@@ -162,17 +166,22 @@ func (t *Transport) updateServers() error {
 	}
 }
 
-func (t *Transport) interfaceUpdated(int) error {
-	return t.updateServers()
+func (t *Transport) interfaceUpdated(int) {
+	err := t.updateServers()
+	if err != nil {
+		t.logger.Error("update servers: ", err)
+	}
 }
 
 func (t *Transport) fetchServers0(ctx context.Context, iface *net.Interface) error {
 	var listener net.ListenConfig
-	listener.Control = control.Append(listener.Control, control.BindToInterfaceFunc(t.router.InterfaceFinder(), func(network string, address string) (interfaceName string, interfaceIndex int) {
-		return iface.Name, iface.Index
-	}))
+	listener.Control = control.Append(listener.Control, control.BindToInterface(t.router.InterfaceFinder(), iface.Name, iface.Index))
 	listener.Control = control.Append(listener.Control, control.ReuseAddr())
-	packetConn, err := listener.ListenPacket(t.ctx, "udp4", "0.0.0.0:68")
+	listenAddr := "0.0.0.0:68"
+	if runtime.GOOS == "linux" || runtime.GOOS == "android" {
+		listenAddr = "255.255.255.255:68"
+	}
+	packetConn, err := listener.ListenPacket(t.ctx, "udp4", listenAddr)
 	if err != nil {
 		return err
 	}
@@ -245,10 +254,10 @@ func (t *Transport) recreateServers(iface *net.Interface, serverAddrs []netip.Ad
 		}), ","), "]")
 	}
 
-	serverDialer := dialer.NewDefault(t.router, option.DialerOptions{
+	serverDialer := common.Must1(dialer.NewDefault(t.router, option.DialerOptions{
 		BindInterface:      iface.Name,
 		UDPFragmentDefault: true,
-	})
+	}))
 	var transports []dns.Transport
 	for _, serverAddr := range serverAddrs {
 		serverTransport, err := dns.NewUDPTransport(t.name, t.ctx, serverDialer, M.Socksaddr{Addr: serverAddr, Port: 53})

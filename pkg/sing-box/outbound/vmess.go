@@ -18,6 +18,7 @@ import (
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
+	"github.com/sagernet/sing/common/ntp"
 )
 
 var _ adapter.Outbound = (*VMess)(nil)
@@ -35,6 +36,10 @@ type VMess struct {
 }
 
 func NewVMess(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.VMessOutboundOptions) (*VMess, error) {
+	outboundDialer, err := dialer.New(router, options.DialerOptions)
+	if err != nil {
+		return nil, err
+	}
 	outbound := &VMess{
 		myOutboundAdapter: myOutboundAdapter{
 			protocol:     C.TypeVMess,
@@ -44,12 +49,11 @@ func NewVMess(ctx context.Context, router adapter.Router, logger log.ContextLogg
 			tag:          tag,
 			dependencies: withDialerDependency(options.DialerOptions),
 		},
-		dialer:     dialer.New(router, options.DialerOptions),
+		dialer:     outboundDialer,
 		serverAddr: options.ServerOptions.Build(),
 	}
-	var err error
 	if options.TLS != nil {
-		outbound.tlsConfig, err = tls.NewClient(router, options.Server, common.PtrValueOrDefault(options.TLS))
+		outbound.tlsConfig, err = tls.NewClient(ctx, options.Server, common.PtrValueOrDefault(options.TLS))
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +78,7 @@ func NewVMess(ctx context.Context, router adapter.Router, logger log.ContextLogg
 		return nil, E.New("unknown packet encoding: ", options.PacketEncoding)
 	}
 	var clientOptions []vmess.ClientOption
-	if timeFunc := router.TimeFunc(); timeFunc != nil {
+	if timeFunc := ntp.TimeFuncFromContext(ctx); timeFunc != nil {
 		clientOptions = append(clientOptions, vmess.ClientWithTimeFunc(timeFunc))
 	}
 	if options.GlobalPadding {
@@ -98,11 +102,11 @@ func NewVMess(ctx context.Context, router adapter.Router, logger log.ContextLogg
 	return outbound, nil
 }
 
-func (h *VMess) InterfaceUpdated() error {
+func (h *VMess) InterfaceUpdated() {
 	if h.multiplexDialer != nil {
 		h.multiplexDialer.Reset()
 	}
-	return nil
+	return
 }
 
 func (h *VMess) Close() error {

@@ -1,3 +1,5 @@
+//go:build go1.20
+
 package dialer
 
 import (
@@ -5,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/sagernet/sing/common"
@@ -22,10 +25,11 @@ type slowOpenConn struct {
 	destination M.Socksaddr
 	conn        net.Conn
 	create      chan struct{}
+	access      sync.Mutex
 	err         error
 }
 
-func DialSlowContext(dialer *tfo.Dialer, ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
+func DialSlowContext(dialer *tcpDialer, ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
 	if dialer.DisableTFO || N.NetworkName(network) != N.NetworkTCP {
 		switch N.NetworkName(network) {
 		case N.NetworkTCP, N.NetworkUDP:
@@ -58,15 +62,26 @@ func (c *slowOpenConn) Read(b []byte) (n int, err error) {
 }
 
 func (c *slowOpenConn) Write(b []byte) (n int, err error) {
-	if c.conn == nil {
-		c.conn, err = c.dialer.DialContext(c.ctx, c.network, c.destination.String(), b)
-		if err != nil {
-			c.err = E.Cause(err, "dial tcp fast open")
-		}
-		close(c.create)
-		return
+	if c.conn != nil {
+		return c.conn.Write(b)
 	}
-	return c.conn.Write(b)
+	c.access.Lock()
+	defer c.access.Unlock()
+	select {
+	case <-c.create:
+		if c.err != nil {
+			return 0, c.err
+		}
+		return c.conn.Write(b)
+	default:
+	}
+	c.conn, err = c.dialer.DialContext(c.ctx, c.network, c.destination.String(), b)
+	if err != nil {
+		c.conn = nil
+		c.err = E.Cause(err, "dial tcp fast open")
+	}
+	close(c.create)
+	return
 }
 
 func (c *slowOpenConn) Close() error {
