@@ -9,6 +9,7 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing-dns"
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
@@ -53,7 +54,7 @@ func NewSocks(router adapter.Router, logger log.ContextLogger, tag string, optio
 		client:  socks.NewClient(outboundDialer, options.ServerOptions.Build(), version, options.Username, options.Password),
 		resolve: version == socks.Version4,
 	}
-	uotOptions := common.PtrValueOrDefault(options.UDPOverTCPOptions)
+	uotOptions := common.PtrValueOrDefault(options.UDPOverTCP)
 	if uotOptions.Enabled {
 		outbound.uotClient = &uot.Client{
 			Dialer:  outbound.client,
@@ -114,7 +115,7 @@ func (h *Socks) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.
 
 func (h *Socks) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext) error {
 	if h.resolve {
-		return NewDirectConnection(ctx, h.router, h, conn, metadata)
+		return NewDirectConnection(ctx, h.router, h, conn, metadata, dns.DomainStrategyUseIPv4)
 	} else {
 		return NewConnection(ctx, h, conn, metadata)
 	}
@@ -122,7 +123,7 @@ func (h *Socks) NewConnection(ctx context.Context, conn net.Conn, metadata adapt
 
 func (h *Socks) NewPacketConnection(ctx context.Context, conn N.PacketConn, metadata adapter.InboundContext) error {
 	if h.resolve {
-		return NewDirectPacketConnection(ctx, h.router, h, conn, metadata)
+		return NewDirectPacketConnection(ctx, h.router, h, conn, metadata, dns.DomainStrategyUseIPv4)
 	} else {
 		return NewPacketConnection(ctx, h, conn, metadata)
 	}

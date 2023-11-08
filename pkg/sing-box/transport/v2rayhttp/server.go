@@ -40,10 +40,6 @@ type Server struct {
 	headers    http.Header
 }
 
-func (s *Server) Network() []string {
-	return []string{N.NetworkTCP}
-}
-
 func NewServer(ctx context.Context, options option.V2RayHTTPOptions, tlsConfig tls.ServerConfig, handler adapter.V2RayServerTransportHandler) (*Server, error) {
 	server := &Server{
 		ctx:       ctx,
@@ -55,16 +51,13 @@ func NewServer(ctx context.Context, options option.V2RayHTTPOptions, tlsConfig t
 		host:    options.Host,
 		path:    options.Path,
 		method:  options.Method,
-		headers: make(http.Header),
+		headers: options.Headers.Build(),
 	}
 	if server.method == "" {
 		server.method = "PUT"
 	}
 	if !strings.HasPrefix(server.path, "/") {
 		server.path = "/" + server.path
-	}
-	for key, value := range options.Headers {
-		server.headers[key] = value
 	}
 	server.httpServer = &http.Server{
 		Handler:           server,
@@ -154,6 +147,10 @@ func (s *Server) invalidRequest(writer http.ResponseWriter, request *http.Reques
 		writer.WriteHeader(statusCode)
 	}
 	s.handler.NewError(request.Context(), E.Cause(err, "process connection from ", request.RemoteAddr))
+}
+
+func (s *Server) Network() []string {
+	return []string{N.NetworkTCP}
 }
 
 func (s *Server) Serve(listener net.Listener) error {

@@ -20,8 +20,9 @@
     }
   ],
   "ignore_client_bandwidth": false,
+  "tls": {},
   "masquerade": "",
-  "tls": {}
+  "brutal_debug": false
 }
 ```
 
@@ -61,9 +62,15 @@ Hysteria 用户
 
 #### ignore_client_bandwidth
 
-命令客户端使用 BBR 流量控制算法而不是 Hysteria CC。
+命令客户端使用 BBR 拥塞控制算法而不是 Hysteria CC。
 
 与 `up_mbps` 和 `down_mbps` 冲突。
+
+#### tls
+
+==必填==
+
+TLS 配置, 参阅 [TLS](/zh/configuration/shared/tls/#inbound)。
 
 #### masquerade
 
@@ -76,8 +83,6 @@ HTTP3 服务器认证失败时的行为。
 
 如果为空，则返回 404 页。
 
-#### tls
+#### brutal_debug
 
-==必填==
-
-TLS 配置, 参阅 [TLS](/zh/configuration/shared/tls/#inbound)。
+启用 Hysteria Brutal CC 的调试信息日志记录。

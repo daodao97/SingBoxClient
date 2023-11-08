@@ -14,3 +14,7 @@
 .DS_Store
 /config.d/
 .conf
+cmd/sing-box/config.json
+cmd/sing-box/*.db
+cmd/sing-box/provider/
+cmd/sing-box/sing-box

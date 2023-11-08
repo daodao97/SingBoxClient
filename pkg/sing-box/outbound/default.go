@@ -11,11 +11,13 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing-dns"
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
 	"github.com/sagernet/sing/common/canceler"
 	E "github.com/sagernet/sing/common/exceptions"
+	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 )
 
@@ -74,7 +76,7 @@ func NewConnection(ctx context.Context, this N.Dialer, conn net.Conn, metadata a
 	return CopyEarlyConn(ctx, conn, outConn)
 }
 
-func NewDirectConnection(ctx context.Context, router adapter.Router, this N.Dialer, conn net.Conn, metadata adapter.InboundContext) error {
+func NewDirectConnection(ctx context.Context, router adapter.Router, this N.Dialer, conn net.Conn, metadata adapter.InboundContext, domainStrategy dns.DomainStrategy) error {
 	ctx = adapter.WithContext(ctx, &metadata)
 	var outConn net.Conn
 	var err error
@@ -82,7 +84,7 @@ func NewDirectConnection(ctx context.Context, router adapter.Router, this N.Dial
 		outConn, err = N.DialSerial(ctx, this, N.NetworkTCP, metadata.Destination, metadata.DestinationAddresses)
 	} else if metadata.Destination.IsFqdn() {
 		var destinationAddresses []netip.Addr
-		destinationAddresses, err = router.LookupDefault(ctx, metadata.Destination.Fqdn)
+		destinationAddresses, err = router.Lookup(ctx, metadata.Destination.Fqdn, domainStrategy)
 		if err != nil {
 			return N.ReportHandshakeFailure(conn, err)
 		}
@@ -118,6 +120,13 @@ func NewPacketConnection(ctx context.Context, this N.Dialer, conn N.PacketConn, 
 		return err
 	}
 	if destinationAddress.IsValid() {
+		if metadata.Destination.IsFqdn() {
+			if metadata.InboundOptions.UDPDisableDomainUnmapping {
+				outConn = bufio.NewUnidirectionalNATPacketConn(bufio.NewPacketConn(outConn), M.SocksaddrFrom(destinationAddress, metadata.Destination.Port), metadata.Destination)
+			} else {
+				outConn = bufio.NewNATPacketConn(bufio.NewPacketConn(outConn), M.SocksaddrFrom(destinationAddress, metadata.Destination.Port), metadata.Destination)
+			}
+		}
 		if natConn, loaded := common.Cast[bufio.NATPacketConn](conn); loaded {
 			natConn.UpdateDestination(destinationAddress)
 		}
@@ -133,7 +142,7 @@ func NewPacketConnection(ctx context.Context, this N.Dialer, conn N.PacketConn, 
 	return bufio.CopyPacketConn(ctx, conn, bufio.NewPacketConn(outConn))
 }
 
-func NewDirectPacketConnection(ctx context.Context, router adapter.Router, this N.Dialer, conn N.PacketConn, metadata adapter.InboundContext) error {
+func NewDirectPacketConnection(ctx context.Context, router adapter.Router, this N.Dialer, conn N.PacketConn, metadata adapter.InboundContext, domainStrategy dns.DomainStrategy) error {
 	ctx = adapter.WithContext(ctx, &metadata)
 	var outConn net.PacketConn
 	var destinationAddress netip.Addr
@@ -142,7 +151,7 @@ func NewDirectPacketConnection(ctx context.Context, router adapter.Router, this 
 		outConn, destinationAddress, err = N.ListenSerial(ctx, this, metadata.Destination, metadata.DestinationAddresses)
 	} else if metadata.Destination.IsFqdn() {
 		var destinationAddresses []netip.Addr
-		destinationAddresses, err = router.LookupDefault(ctx, metadata.Destination.Fqdn)
+		destinationAddresses, err = router.Lookup(ctx, metadata.Destination.Fqdn, domainStrategy)
 		if err != nil {
 			return N.ReportHandshakeFailure(conn, err)
 		}
@@ -158,6 +167,9 @@ func NewDirectPacketConnection(ctx context.Context, router adapter.Router, this 
 		return err
 	}
 	if destinationAddress.IsValid() {
+		if metadata.Destination.IsFqdn() {
+			outConn = bufio.NewNATPacketConn(bufio.NewPacketConn(outConn), M.SocksaddrFrom(destinationAddress, metadata.Destination.Port), metadata.Destination)
+		}
 		if natConn, loaded := common.Cast[bufio.NATPacketConn](conn); loaded {
 			natConn.UpdateDestination(destinationAddress)
 		}

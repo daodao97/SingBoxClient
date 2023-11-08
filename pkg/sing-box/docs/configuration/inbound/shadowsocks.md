@@ -8,7 +8,8 @@
   ... // Listen Fields
 
   "method": "2022-blake3-aes-128-gcm",
-  "password": "8JCsPssfgS8tiRwiMlhARg=="
+  "password": "8JCsPssfgS8tiRwiMlhARg==",
+  "multiplex": {}
 }
 ```
 
@@ -23,7 +24,8 @@
       "name": "sekai",
       "password": "PCD2Z4o12bKUoFa3cC97Hw=="
     }
-  ]
+  ],
+  "multiplex": {}
 }
 ```
 
@@ -41,7 +43,8 @@
       "server_port": 8080,
       "password": "PCD2Z4o12bKUoFa3cC97Hw=="
     }
-  ]
+  ],
+  "multiplex": {}
 }
 ```
 
@@ -83,48 +86,6 @@ Both if empty.
 | 2022 methods  | `sing-box generate rand --base64 <Key Length>` |
 | other methods | any string                                     |
 
-### Listen Fields
+#### multiplex
 
-#### listen
-
-==Required==
-
-Listen address.
-
-#### listen_port
-
-==Required==
-
-Listen port.
-
-#### tcp_fast_open
-
-Enable tcp fast open for listener.
-
-#### sniff
-
-Enable sniffing.
-
-See [Protocol Sniff](/configuration/route/sniff/) for details.
-
-#### sniff_override_destination
-
-Override the connection destination address with the sniffed domain.
-
-If the domain name is invalid (like tor), this will not work.
-
-#### domain_strategy
-
-One of `prefer_ipv4` `prefer_ipv6` `ipv4_only` `ipv6_only`.
-
-If set, the requested domain name will be resolved to IP before routing.
-
-If `sniff_override_destination` is in effect, its value will be taken as a fallback.
-
-#### udp_timeout
-
-UDP NAT expiration time in seconds, default is 300 (5 minutes).
-
-#### proxy_protocol
-
-Parse [Proxy Protocol](https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt) in the connection header.
+See [Multiplex](/configuration/shared/multiplex#inbound) for details.

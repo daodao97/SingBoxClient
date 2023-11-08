@@ -13,7 +13,7 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
-	"github.com/sagernet/sing-box/transport/hysteria"
+	"github.com/sagernet/sing-quic/hysteria"
 	"github.com/sagernet/sing-quic/hysteria2"
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/bufio"
@@ -61,6 +61,8 @@ func NewHysteria2(ctx context.Context, router adapter.Router, logger log.Context
 	client, err := hysteria2.NewClient(hysteria2.ClientOptions{
 		Context:            ctx,
 		Dialer:             outboundDialer,
+		Logger:             logger,
+		BrutalDebug:        options.BrutalDebug,
 		ServerAddress:      options.ServerOptions.Build(),
 		SendBPS:            uint64(options.UpMbps * hysteria.MbpsToBps),
 		ReceiveBPS:         uint64(options.DownMbps * hysteria.MbpsToBps),

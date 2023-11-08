@@ -2,7 +2,6 @@ package inbound
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/binary"
 	"io"
 	"math/rand"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/tls"
+	"github.com/sagernet/sing-box/common/uot"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/log"
@@ -44,7 +44,7 @@ func NewNaive(ctx context.Context, router adapter.Router, logger log.ContextLogg
 			protocol:      C.TypeNaive,
 			network:       options.Network.Build(),
 			ctx:           ctx,
-			router:        router,
+			router:        uot.NewRouter(router, logger),
 			logger:        logger,
 			tag:           tag,
 			listenOptions: options.ListenOptions,
@@ -139,14 +139,9 @@ func (n *Naive) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		n.badRequest(ctx, request, E.New("missing naive padding"))
 		return
 	}
-	var authOk bool
-	var userName string
-	authorization := request.Header.Get("Proxy-Authorization")
-	if strings.HasPrefix(authorization, "BASIC ") || strings.HasPrefix(authorization, "Basic ") {
-		userPassword, _ := base64.URLEncoding.DecodeString(authorization[6:])
-		userPswdArr := strings.SplitN(string(userPassword), ":", 2)
-		userName = userPswdArr[0]
-		authOk = n.authenticator.Verify(userPswdArr[0], userPswdArr[1])
+	userName, password, authOk := sHttp.ParseBasicAuth(request.Header.Get("Proxy-Authorization"))
+	if authOk {
+		authOk = n.authenticator.Verify(userName, password)
 	}
 	if !authOk {
 		rejectHTTP(writer, http.StatusProxyAuthRequired)

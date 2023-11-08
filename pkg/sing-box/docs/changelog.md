@@ -1,3 +1,194 @@
+#### 1.7.0-alpha.5
+
+* Fixes and improvements
+
+#### 1.7.0-alpha.4
+
+* Migrate multiplex and UoT server to inbound **1**
+* Add TCP Brutal support for multiplex **2**
+
+**1**:
+
+Starting in 1.7.0, multiplexing support is no longer enabled by default and needs to be turned on explicitly in inbound options.
+
+**2**
+
+Hysteria Brutal Congestion Control Algorithm in TCP. A kernel module needs to be installed on the Linux server, see [TCP Brutal](/configuration/shared/tcp-brutal) for details.
+
+#### 1.7.0-alpha.3
+
+* Add [HTTPUpgrade V2Ray transport](/configuration/shared/v2ray-transport#HTTPUpgrade) support **1**
+* Fixes and improvements
+
+**1**:
+
+Introduced in V2Ray 5.10.0.
+
+The new HTTPUpgrade transport has better performance than WebSocket and is better suited for CDN abuse.
+
+#### 1.6.0
+
+* Fixes and improvements
+
+Important changes since 1.5:
+
+* Our [Apple tvOS client](/installation/clients/sft) is now available in the App Store 🍎
+* Update BBR congestion control for TUIC and Hysteria2 **1**
+* Update brutal congestion control for Hysteria2
+* Add `brutal_debug` option for Hysteria2
+* Update legacy Hysteria protocol **2**
+* Add TLS self sign key pair generate command
+* Remove [Deprecated Features](/deprecated) by agreement
+
+**1**:
+
+None of the existing Golang BBR congestion control implementations have been reviewed or unit tested.
+This update is intended to address the multi-send defects of the old implementation and may introduce new issues.
+
+**2**
+
+Based on discussions with the original author, the brutal CC and QUIC protocol parameters of
+the old protocol (Hysteria 1) have been updated to be consistent with Hysteria 2
+
+#### 1.7.0-alpha.2
+
+* Fix bugs introduced in 1.7.0-alpha.1
+
+#### 1.7.0-alpha.1
+
+* Add [exclude route support](/configuration/inbound/tun) for TUN inbound
+* Add `udp_disable_domain_unmapping` [inbound listen option](/configuration/shared/listen) **1**
+* Fixes and improvements
+
+**1**:
+
+If enabled, for UDP proxy requests addressed to a domain,
+the original packet address will be sent in the response instead of the mapped domain.
+
+This option is used for compatibility with clients that
+do not support receiving UDP packets with domain addresses, such as Surge.
+
+#### 1.5.5
+
+* Fix IPv6 `auto_route` for Linux **1**
+* Add legacy builds for old Windows and macOS systems **2**
+* Fixes and improvements
+
+**1**:
+
+When `auto_route` is enabled and `strict_route` is disabled, the device can now be reached from external IPv6 addresses.
+
+**2**:
+
+Built using Go 1.20, the last version that will run on Windows 7, 8, Server 2008, Server 2012 and macOS 10.13 High Sierra, 10.14 Mojave.
+
+
+#### 1.6.0-rc.4
+
+* Fixes and improvements
+
+#### 1.6.0-rc.1
+
+* Add legacy builds for old Windows and macOS systems **1**
+* Fixes and improvements
+
+**1**:
+
+Built using Go 1.20, the last version that will run on Windows 7, 8, Server 2008, Server 2012 and macOS 10.13 High Sierra, 10.14 Mojave.
+
+#### 1.6.0-beta.4
+
+* Fix IPv6 `auto_route` for Linux **1**
+* Fixes and improvements
+
+**1**:
+
+When `auto_route` is enabled and `strict_route` is disabled, the device can now be reached from external IPv6 addresses.
+
+#### 1.5.4
+
+* Fix Clash cache crash on arm32 devices
+* Fixes and improvements
+
+#### 1.6.0-beta.3
+
+* Update the legacy Hysteria protocol **1**
+* Fixes and improvements
+
+**1**
+
+Based on discussions with the original author, the brutal CC and QUIC protocol parameters of
+the old protocol (Hysteria 1) have been updated to be consistent with Hysteria 2
+
+#### 1.6.0-beta.2
+
+* Add TLS self sign key pair generate command
+* Update brutal congestion control for Hysteria2
+* Fix Clash cache crash on arm32 devices
+* Update golang.org/x/net to v0.17.0
+* Fixes and improvements
+
+#### 1.6.0-beta.3
+
+* Update the legacy Hysteria protocol **1**
+* Fixes and improvements
+
+**1**
+
+Based on discussions with the original author, the brutal CC and QUIC protocol parameters of
+the old protocol (Hysteria 1) have been updated to be consistent with Hysteria 2
+
+#### 1.6.0-beta.2
+
+* Add TLS self sign key pair generate command
+* Update brutal congestion control for Hysteria2
+* Fix Clash cache crash on arm32 devices
+* Update golang.org/x/net to v0.17.0
+* Fixes and improvements
+
+#### 1.5.3
+
+* Fix compatibility with Android 14
+* Fixes and improvements
+
+#### 1.6.0-beta.1
+
+* Fixes and improvements
+
+#### 1.6.0-alpha.5
+
+* Fix compatibility with Android 14
+* Update BBR congestion control for TUIC and Hysteria2 **1**
+* Fixes and improvements
+
+**1**:
+
+None of the existing Golang BBR congestion control implementations have been reviewed or unit tested.
+This update is intended to fix a memory leak flaw in the new implementation introduced in 1.6.0-alpha.1 and may
+introduce new issues.
+
+#### 1.6.0-alpha.4
+
+* Add `brutal_debug` option for Hysteria2
+* Fixes and improvements
+
+#### 1.5.2
+
+* Our [Apple tvOS client](/installation/clients/sft) is now available in the App Store 🍎
+* Fixes and improvements
+
+#### 1.6.0-alpha.3
+
+* Fixes and improvements
+
+#### 1.6.0-alpha.2
+
+* Fixes and improvements
+
+#### 1.5.1
+
+* Fixes and improvements
+
 #### 1.6.0-alpha.1
 
 * Update BBR congestion control for TUIC and Hysteria2 **1**

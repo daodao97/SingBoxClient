@@ -14,7 +14,7 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
-	"github.com/sagernet/sing-box/transport/hysteria"
+	"github.com/sagernet/sing-quic/hysteria"
 	"github.com/sagernet/sing-quic/hysteria2"
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/auth"
@@ -32,6 +32,7 @@ type Hysteria2 struct {
 }
 
 func NewHysteria2(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.Hysteria2InboundOptions) (*Hysteria2, error) {
+	options.UDPFragmentDefault = true
 	if options.TLS == nil || !options.TLS.Enabled {
 		return nil, C.ErrTLSRequired
 	}
@@ -89,6 +90,7 @@ func NewHysteria2(ctx context.Context, router adapter.Router, logger log.Context
 	service, err := hysteria2.NewService[int](hysteria2.ServiceOptions{
 		Context:               ctx,
 		Logger:                logger,
+		BrutalDebug:           options.BrutalDebug,
 		SendBPS:               uint64(options.UpMbps * hysteria.MbpsToBps),
 		ReceiveBPS:            uint64(options.DownMbps * hysteria.MbpsToBps),
 		SalamanderPassword:    salamanderPassword,

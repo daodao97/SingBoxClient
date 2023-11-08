@@ -1,6 +1,7 @@
 package option
 
 import (
+	"net/http"
 	"net/netip"
 	"strings"
 	"time"
@@ -171,34 +172,6 @@ func (d *Duration) UnmarshalJSON(bytes []byte) error {
 	return nil
 }
 
-type ListenPrefix netip.Prefix
-
-func (p ListenPrefix) MarshalJSON() ([]byte, error) {
-	prefix := netip.Prefix(p)
-	if !prefix.IsValid() {
-		return json.Marshal(nil)
-	}
-	return json.Marshal(prefix.String())
-}
-
-func (p *ListenPrefix) UnmarshalJSON(bytes []byte) error {
-	var value string
-	err := json.Unmarshal(bytes, &value)
-	if err != nil {
-		return err
-	}
-	prefix, err := netip.ParsePrefix(value)
-	if err != nil {
-		return err
-	}
-	*p = ListenPrefix(prefix)
-	return nil
-}
-
-func (p ListenPrefix) Build() netip.Prefix {
-	return netip.Prefix(p)
-}
-
 type DNSQueryType uint16
 
 func (t DNSQueryType) MarshalJSON() ([]byte, error) {
@@ -234,4 +207,16 @@ func DNSQueryTypeToString(queryType uint16) string {
 		return typeName
 	}
 	return F.ToString(queryType)
+}
+
+type HTTPHeader map[string]Listable[string]
+
+func (h HTTPHeader) Build() http.Header {
+	header := make(http.Header)
+	for name, values := range h {
+		for _, value := range values {
+			header.Add(name, value)
+		}
+	}
+	return header
 }
