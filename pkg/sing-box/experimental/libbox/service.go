@@ -3,6 +3,7 @@ package libbox
 import (
 	"context"
 	"net/netip"
+	"runtime"
 	runtimeDebug "runtime/debug"
 	"syscall"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/sagernet/sing-box/common/urltest"
 	"github.com/sagernet/sing-box/experimental/libbox/internal/procfs"
 	"github.com/sagernet/sing-box/experimental/libbox/platform"
+	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-tun"
 	"github.com/sagernet/sing/common"
@@ -44,10 +46,12 @@ func NewService(configContent string, platformInterface PlatformInterface) (*Box
 	ctx = service.ContextWithPtr(ctx, urlTestHistoryStorage)
 	pauseManager := pause.NewDefaultManager(ctx)
 	ctx = pause.ContextWithManager(ctx, pauseManager)
+	platformWrapper := &platformInterfaceWrapper{iif: platformInterface, useProcFS: platformInterface.UseProcFS()}
 	instance, err := box.New(box.Options{
 		Context:           ctx,
 		Options:           options,
-		PlatformInterface: &platformInterfaceWrapper{iif: platformInterface, useProcFS: platformInterface.UseProcFS()},
+		PlatformInterface: platformWrapper,
+		PlatformLogWriter: platformWrapper,
 	})
 	if err != nil {
 		cancel()
@@ -83,7 +87,10 @@ func (s *BoxService) Wake() {
 	_ = s.instance.Router().ResetNetwork()
 }
 
-var _ platform.Interface = (*platformInterfaceWrapper)(nil)
+var (
+	_ platform.Interface = (*platformInterfaceWrapper)(nil)
+	_ log.PlatformWriter = (*platformInterfaceWrapper)(nil)
+)
 
 type platformInterfaceWrapper struct {
 	iif       PlatformInterface
@@ -115,7 +122,7 @@ func (w *platformInterfaceWrapper) OpenTun(options *tun.Options, platformOptions
 	if len(options.IncludeAndroidUser) > 0 {
 		return nil, E.New("android: unsupported android_user option")
 	}
-	routeRanges, err := options.BuildAutoRouteRanges()
+	routeRanges, err := options.BuildAutoRouteRanges(true)
 	if err != nil {
 		return nil, err
 	}
@@ -133,11 +140,6 @@ func (w *platformInterfaceWrapper) OpenTun(options *tun.Options, platformOptions
 	}
 	options.FileDescriptor = dupFd
 	return tun.New(*options)
-}
-
-func (w *platformInterfaceWrapper) Write(p []byte) (n int, err error) {
-	w.iif.WriteLog(string(p))
-	return len(p), nil
 }
 
 func (w *platformInterfaceWrapper) FindProcessInfo(ctx context.Context, network string, source netip.AddrPort, destination netip.AddrPort) (*process.Info, error) {
@@ -206,4 +208,20 @@ func (w *platformInterfaceWrapper) UnderNetworkExtension() bool {
 
 func (w *platformInterfaceWrapper) ClearDNSCache() {
 	w.iif.ClearDNSCache()
+}
+
+func (w *platformInterfaceWrapper) ReadWIFIState() adapter.WIFIState {
+	wifiState := w.iif.ReadWIFIState()
+	if wifiState == nil {
+		return adapter.WIFIState{}
+	}
+	return (adapter.WIFIState)(*wifiState)
+}
+
+func (w *platformInterfaceWrapper) DisableColors() bool {
+	return runtime.GOOS != "android"
+}
+
+func (w *platformInterfaceWrapper) WriteMessage(level log.Level, message string) {
+	w.iif.WriteLog(message)
 }

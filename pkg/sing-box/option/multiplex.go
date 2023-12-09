@@ -7,13 +7,13 @@ type InboundMultiplexOptions struct {
 }
 
 type OutboundMultiplexOptions struct {
-	Enabled        bool   `json:"enabled,omitempty"`
-	Protocol       string `json:"protocol,omitempty"`
-	MaxConnections int    `json:"max_connections,omitempty"`
-	MinStreams     int    `json:"min_streams,omitempty"`
-	MaxStreams     int    `json:"max_streams,omitempty"`
-	Padding        bool   `json:"padding,omitempty"`
-	Brutal         bool   `json:"brutal,omitempty"`
+	Enabled        bool           `json:"enabled,omitempty"`
+	Protocol       string         `json:"protocol,omitempty"`
+	MaxConnections int            `json:"max_connections,omitempty"`
+	MinStreams     int            `json:"min_streams,omitempty"`
+	MaxStreams     int            `json:"max_streams,omitempty"`
+	Padding        bool           `json:"padding,omitempty"`
+	Brutal         *BrutalOptions `json:"brutal,omitempty"`
 }
 
 type BrutalOptions struct {

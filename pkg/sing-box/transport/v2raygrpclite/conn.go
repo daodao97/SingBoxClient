@@ -49,7 +49,9 @@ func newLateGunConn(writer io.Writer) *GunConn {
 }
 
 func (c *GunConn) setup(reader io.Reader, err error) {
-	c.reader = std_bufio.NewReader(reader)
+	if reader != nil {
+		c.reader = std_bufio.NewReader(reader)
+	}
 	c.err = err
 	close(c.create)
 }
@@ -143,7 +145,7 @@ func (c *GunConn) LocalAddr() net.Addr {
 }
 
 func (c *GunConn) RemoteAddr() net.Addr {
-	return nil
+	return M.Socksaddr{}
 }
 
 func (c *GunConn) SetDeadline(t time.Time) error {

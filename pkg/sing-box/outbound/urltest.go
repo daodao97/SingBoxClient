@@ -3,7 +3,6 @@ package outbound
 import (
 	"context"
 	"net"
-	"sort"
 	"sync"
 	"time"
 
@@ -83,7 +82,7 @@ func (s *URLTest) Start() error {
 }
 
 func (s *URLTest) PostStart() error {
-	go s.CheckOutbounds()
+	s.group.PostStart()
 	return nil
 }
 
@@ -101,8 +100,8 @@ func (s *URLTest) All() []string {
 	return s.tags
 }
 
-func (s *URLTest) URLTest(ctx context.Context, link string) (map[string]uint16, error) {
-	return s.group.URLTest(ctx, link)
+func (s *URLTest) URLTest(ctx context.Context) (map[string]uint16, error) {
+	return s.group.URLTest(ctx)
 }
 
 func (s *URLTest) CheckOutbounds() {
@@ -110,7 +109,7 @@ func (s *URLTest) CheckOutbounds() {
 }
 
 func (s *URLTest) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
-	s.group.Start()
+	s.group.Touch()
 	outbound := s.group.Select(network)
 	conn, err := outbound.DialContext(ctx, network, destination)
 	if err == nil {
@@ -122,7 +121,7 @@ func (s *URLTest) DialContext(ctx context.Context, network string, destination M
 }
 
 func (s *URLTest) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.PacketConn, error) {
-	s.group.Start()
+	s.group.Touch()
 	outbound := s.group.Select(N.NetworkUDP)
 	conn, err := outbound.ListenPacket(ctx, destination)
 	if err == nil {
@@ -164,9 +163,11 @@ type URLTestGroup struct {
 	interruptGroup               *interrupt.Group
 	interruptExternalConnections bool
 
-	access sync.Mutex
-	ticker *time.Ticker
-	close  chan struct{}
+	access     sync.Mutex
+	ticker     *time.Ticker
+	close      chan struct{}
+	started    bool
+	lastActive atomic.TypedValue[time.Time]
 }
 
 func NewURLTestGroup(
@@ -208,8 +209,18 @@ func NewURLTestGroup(
 	}
 }
 
-func (g *URLTestGroup) Start() {
+func (g *URLTestGroup) PostStart() {
+	g.started = true
+	g.lastActive.Store(time.Now())
+	go g.CheckOutbounds(false)
+}
+
+func (g *URLTestGroup) Touch() {
+	if !g.started {
+		return
+	}
 	if g.ticker != nil {
+		g.lastActive.Store(time.Now())
 		return
 	}
 	g.access.Lock()
@@ -260,51 +271,30 @@ func (g *URLTestGroup) Select(network string) adapter.Outbound {
 	return minOutbound
 }
 
-func (g *URLTestGroup) Fallback(used adapter.Outbound) []adapter.Outbound {
-	outbounds := make([]adapter.Outbound, 0, len(g.outbounds)-1)
-	for _, detour := range g.outbounds {
-		if detour != used {
-			outbounds = append(outbounds, detour)
-		}
-	}
-	sort.SliceStable(outbounds, func(i, j int) bool {
-		oi := outbounds[i]
-		oj := outbounds[j]
-		hi := g.history.LoadURLTestHistory(RealTag(oi))
-		if hi == nil {
-			return false
-		}
-		hj := g.history.LoadURLTestHistory(RealTag(oj))
-		if hj == nil {
-			return false
-		}
-		return hi.Delay < hj.Delay
-	})
-	return outbounds
-}
-
 func (g *URLTestGroup) loopCheck() {
-	go g.CheckOutbounds(true)
+	if time.Now().Sub(g.lastActive.Load()) > g.interval {
+		g.CheckOutbounds(false)
+	}
 	for {
-		g.pauseManager.WaitActive()
 		select {
 		case <-g.close:
 			return
 		case <-g.ticker.C:
-			g.CheckOutbounds(false)
 		}
+		g.pauseManager.WaitActive()
+		g.CheckOutbounds(false)
 	}
 }
 
 func (g *URLTestGroup) CheckOutbounds(force bool) {
-	_, _ = g.urlTest(g.ctx, g.link, force)
+	_, _ = g.urlTest(g.ctx, force)
 }
 
-func (g *URLTestGroup) URLTest(ctx context.Context, link string) (map[string]uint16, error) {
-	return g.urlTest(ctx, link, false)
+func (g *URLTestGroup) URLTest(ctx context.Context) (map[string]uint16, error) {
+	return g.urlTest(ctx, false)
 }
 
-func (g *URLTestGroup) urlTest(ctx context.Context, link string, force bool) (map[string]uint16, error) {
+func (g *URLTestGroup) urlTest(ctx context.Context, force bool) (map[string]uint16, error) {
 	result := make(map[string]uint16)
 	if g.checking.Swap(true) {
 		return result, nil
@@ -331,7 +321,7 @@ func (g *URLTestGroup) urlTest(ctx context.Context, link string, force bool) (ma
 		b.Go(realTag, func() (any, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), C.TCPTimeout)
 			defer cancel()
-			t, err := urltest.URLTest(ctx, link, p)
+			t, err := urltest.URLTest(ctx, g.link, p)
 			if err != nil {
 				g.logger.Debug("outbound ", tag, " unavailable: ", err)
 				g.history.DeleteURLTestHistory(realTag)

@@ -1,7 +1,6 @@
 package v2raywebsocket
 
 import (
-	"bufio"
 	"context"
 	"encoding/base64"
 	"io"
@@ -15,6 +14,7 @@ import (
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/debug"
 	E "github.com/sagernet/sing/common/exceptions"
+	M "github.com/sagernet/sing/common/metadata"
 	"github.com/sagernet/ws"
 	"github.com/sagernet/ws/wsutil"
 )
@@ -28,19 +28,13 @@ type WebsocketConn struct {
 	remoteAddr     net.Addr
 }
 
-func NewConn(conn net.Conn, br *bufio.Reader, remoteAddr net.Addr, state ws.State) *WebsocketConn {
+func NewConn(conn net.Conn, remoteAddr net.Addr, state ws.State) *WebsocketConn {
 	controlHandler := wsutil.ControlFrameHandler(conn, state)
-	var reader io.Reader
-	if br != nil && br.Buffered() > 0 {
-		reader = br
-	} else {
-		reader = conn
-	}
 	return &WebsocketConn{
 		Conn:  conn,
 		state: state,
 		reader: &wsutil.Reader{
-			Source:          reader,
+			Source:          conn,
 			State:           state,
 			SkipHeaderCheck: !debug.Enabled,
 			OnIntermediate:  controlHandler,
@@ -178,11 +172,17 @@ func (c *EarlyWebsocketConn) writeRequest(content []byte) error {
 	} else {
 		conn, err = c.dialContext(c.ctx, &c.requestURL, c.headers)
 	}
-	c.conn = conn
-	if len(lateData) > 0 {
-		_, err = c.conn.Write(lateData)
+	if err != nil {
+		return err
 	}
-	return err
+	if len(lateData) > 0 {
+		_, err = conn.Write(lateData)
+		if err != nil {
+			return err
+		}
+	}
+	c.conn = conn
+	return nil
 }
 
 func (c *EarlyWebsocketConn) Write(b []byte) (n int, err error) {
@@ -191,6 +191,9 @@ func (c *EarlyWebsocketConn) Write(b []byte) (n int, err error) {
 	}
 	c.access.Lock()
 	defer c.access.Unlock()
+	if c.err != nil {
+		return 0, c.err
+	}
 	if c.conn != nil {
 		return c.conn.Write(b)
 	}
@@ -212,6 +215,9 @@ func (c *EarlyWebsocketConn) WriteBuffer(buffer *buf.Buffer) error {
 	if c.conn != nil {
 		return c.conn.WriteBuffer(buffer)
 	}
+	if c.err != nil {
+		return c.err
+	}
 	err := c.writeRequest(buffer.Bytes())
 	c.err = err
 	close(c.create)
@@ -227,14 +233,14 @@ func (c *EarlyWebsocketConn) Close() error {
 
 func (c *EarlyWebsocketConn) LocalAddr() net.Addr {
 	if c.conn == nil {
-		return nil
+		return M.Socksaddr{}
 	}
 	return c.conn.LocalAddr()
 }
 
 func (c *EarlyWebsocketConn) RemoteAddr() net.Addr {
 	if c.conn == nil {
-		return nil
+		return M.Socksaddr{}
 	}
 	return c.conn.RemoteAddr()
 }

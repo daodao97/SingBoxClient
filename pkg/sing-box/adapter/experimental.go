@@ -47,7 +47,7 @@ type ProxyProvider interface {
 
 type URLTestGroup interface {
 	OutboundGroup
-	URLTest(ctx context.Context, url string) (map[string]uint16, error)
+	URLTest(ctx context.Context) (map[string]uint16, error)
 }
 
 func OutboundTag(detour Outbound) string {

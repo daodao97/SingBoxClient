@@ -2,7 +2,6 @@ package platform
 
 import (
 	"context"
-	"io"
 	"net/netip"
 
 	"github.com/sagernet/sing-box/adapter"
@@ -24,8 +23,8 @@ type Interface interface {
 	Interfaces() ([]NetworkInterface, error)
 	UnderNetworkExtension() bool
 	ClearDNSCache()
+	ReadWIFIState() adapter.WIFIState
 	process.Searcher
-	io.Writer
 }
 
 type NetworkInterface struct {

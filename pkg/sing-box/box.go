@@ -41,6 +41,7 @@ type Options struct {
 	option.Options
 	Context           context.Context
 	PlatformInterface platform.Interface
+	PlatformLogWriter log.PlatformWriter
 }
 
 func New(options Options) (*Box, error) {
@@ -55,7 +56,7 @@ func New(options Options) (*Box, error) {
 	applyDebugOptions(common.PtrValueOrDefault(experimentalOptions.Debug))
 	var needClashAPI bool
 	var needV2RayAPI bool
-	if experimentalOptions.ClashAPI != nil || options.PlatformInterface != nil {
+	if experimentalOptions.ClashAPI != nil || options.PlatformLogWriter != nil {
 		needClashAPI = true
 	}
 	if experimentalOptions.V2RayAPI != nil && experimentalOptions.V2RayAPI.Listen != "" {
@@ -71,7 +72,7 @@ func New(options Options) (*Box, error) {
 		Observable:     needClashAPI,
 		DefaultWriter:  defaultLogWriter,
 		BaseTime:       createdAt,
-		PlatformWriter: options.PlatformInterface,
+		PlatformWriter: options.PlatformLogWriter,
 	})
 	if err != nil {
 		return nil, E.Cause(err, "create log factory")
@@ -257,7 +258,7 @@ func (s *Box) start() error {
 			return E.Cause(err, "initialize inbound/", in.Type(), "[", tag, "]")
 		}
 	}
-	return nil
+	return s.postStart()
 }
 
 func (s *Box) postStart() error {
@@ -268,16 +269,17 @@ func (s *Box) postStart() error {
 			return E.Cause(err, "start ", serviceName)
 		}
 	}
-	for serviceName, service := range s.outbounds {
-		if lateService, isLateService := service.(adapter.PostStarter); isLateService {
-			s.logger.Trace("post-starting ", service)
-			err := lateService.PostStart()
+	for _, outbound := range s.outbounds {
+		if lateOutbound, isLateOutbound := outbound.(adapter.PostStarter); isLateOutbound {
+			s.logger.Trace("post-starting outbound/", outbound.Tag())
+			err := lateOutbound.PostStart()
 			if err != nil {
-				return E.Cause(err, "post-start ", serviceName)
+				return E.Cause(err, "post-start outbound/", outbound.Tag())
 			}
 		}
 	}
-	return nil
+	s.logger.Trace("post-starting router")
+	return s.router.PostStart()
 }
 
 func (s *Box) Close() error {

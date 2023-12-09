@@ -1,4 +1,154 @@
-#### 1.7.0-alpha.5
+---
+icon: material/alert-decagram
+---
+
+# ChangeLog
+
+#### 1.7.4
+
+* Fixes and improvements
+
+_Due to the long waiting time, this version is no longer waiting for approval 
+by the Apple App Store, so updates to Apple Platforms will be delayed._
+
+#### 1.7.2
+
+* Fixes and improvements
+
+#### 1.7.1
+
+* Fixes and improvements
+
+#### 1.7.0
+
+* Fixes and improvements
+
+Important changes since 1.6:
+
+* Add [exclude route support](/configuration/inbound/tun) for TUN inbound
+* Add `udp_disable_domain_unmapping` [inbound listen option](/configuration/shared/listen) **1**
+* Add [HTTPUpgrade V2Ray transport](/configuration/shared/v2ray-transport#HTTPUpgrade) support **2**
+* Migrate multiplex and UoT server to inbound **3**
+* Add TCP Brutal support for multiplex **4**
+* Add `wifi_ssid` and `wifi_bssid` route and DNS rules **5**
+* Update quic-go to v0.40.0
+* Update gVisor to 20231113.0
+
+**1**:
+
+If enabled, for UDP proxy requests addressed to a domain,
+the original packet address will be sent in the response instead of the mapped domain.
+
+This option is used for compatibility with clients that
+do not support receiving UDP packets with domain addresses, such as Surge.
+
+**2**:
+
+Introduced in V2Ray 5.10.0.
+
+The new HTTPUpgrade transport has better performance than WebSocket and is better suited for CDN abuse.
+
+**3**:
+
+Starting in 1.7.0, multiplexing support is no longer enabled by default
+and needs to be turned on explicitly in inbound options.
+
+**4**
+
+Hysteria Brutal Congestion Control Algorithm in TCP. A kernel module needs to be installed on the Linux server,
+see [TCP Brutal](/configuration/shared/tcp-brutal) for details.
+
+**5**:
+
+Only supported in graphical clients on Android and iOS.
+
+#### 1.7.0-rc.3
+
+* Fixes and improvements
+
+#### 1.6.7
+
+* macOS: Add button for uninstall SystemExtension in the standalone graphical client
+* Fix missing UDP user context on TUIC/Hysteria2 inbounds
+* Fixes and improvements
+
+#### 1.7.0-rc.2
+
+* Fix missing UDP user context on TUIC/Hysteria2 inbounds
+* macOS: Add button for uninstall SystemExtension in the standalone graphical client
+
+#### 1.6.6
+
+* Fixes and improvements
+
+#### 1.7.0-rc.1
+
+* Fixes and improvements
+
+#### 1.7.0-beta.5
+
+* Update gVisor to 20231113.0
+* Fixes and improvements
+
+#### 1.7.0-beta.4
+
+* Add `wifi_ssid` and `wifi_bssid` route and DNS rules **1**
+* Fixes and improvements
+
+**1**:
+
+Only supported in graphical clients on Android and iOS.
+
+#### 1.7.0-beta.3
+
+* Fix zero TTL was incorrectly reset
+* Fixes and improvements
+
+#### 1.6.5
+
+* Fix crash if TUIC inbound authentication failed
+* Fixes and improvements
+
+#### 1.7.0-beta.2
+
+* Fix crash if TUIC inbound authentication failed
+* Update quic-go to v0.40.0
+* Fixes and improvements
+
+#### 1.6.4
+
+* Fixes and improvements
+
+#### 1.7.0-beta.1
+
+* Fixes and improvements
+
+#### 1.6.3
+
+* iOS/Android: Fix profile auto update
+* Fixes and improvements
+
+#### 1.7.0-alpha.11
+
+* iOS/Android: Fix profile auto update
+* Fixes and improvements
+
+#### 1.7.0-alpha.10
+
+* Fix tcp-brutal not working with TLS
+* Fix Android client not closing in some cases
+* Fixes and improvements
+
+#### 1.6.2
+
+* Fixes and improvements
+
+#### 1.6.1
+
+* Our [Android client](/installation/clients/sfa) is now available in the Google Play Store ▶️
+* Fixes and improvements
+
+#### 1.7.0-alpha.6
 
 * Fixes and improvements
 
@@ -9,11 +159,13 @@
 
 **1**:
 
-Starting in 1.7.0, multiplexing support is no longer enabled by default and needs to be turned on explicitly in inbound options.
+Starting in 1.7.0, multiplexing support is no longer enabled by default and needs to be turned on explicitly in inbound
+options.
 
 **2**
 
-Hysteria Brutal Congestion Control Algorithm in TCP. A kernel module needs to be installed on the Linux server, see [TCP Brutal](/configuration/shared/tcp-brutal) for details.
+Hysteria Brutal Congestion Control Algorithm in TCP. A kernel module needs to be installed on the Linux server,
+see [TCP Brutal](/configuration/shared/tcp-brutal) for details.
 
 #### 1.7.0-alpha.3
 
@@ -80,8 +232,8 @@ When `auto_route` is enabled and `strict_route` is disabled, the device can now 
 
 **2**:
 
-Built using Go 1.20, the last version that will run on Windows 7, 8, Server 2008, Server 2012 and macOS 10.13 High Sierra, 10.14 Mojave.
-
+Built using Go 1.20, the last version that will run on
+Windows 7, 8, Server 2008, Server 2012 and macOS 10.13 High Sierra, 10.14 Mojave.
 
 #### 1.6.0-rc.4
 
@@ -94,7 +246,8 @@ Built using Go 1.20, the last version that will run on Windows 7, 8, Server 2008
 
 **1**:
 
-Built using Go 1.20, the last version that will run on Windows 7, 8, Server 2008, Server 2012 and macOS 10.13 High Sierra, 10.14 Mojave.
+Built using Go 1.20, the last version that will run on
+Windows 7, 8, Server 2008, Server 2012 and macOS 10.13 High Sierra, 10.14 Mojave.
 
 #### 1.6.0-beta.4
 
