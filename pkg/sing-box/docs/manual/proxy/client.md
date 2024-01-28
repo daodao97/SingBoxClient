@@ -322,21 +322,60 @@ flowchart TB
             "server": "google"
           },
           {
-            "type": "logical",
-            "mode": "and",
-            "rules": [
-              {
-                "geosite": "geolocation-!cn",
-                "invert": true
-              },
-              {
-                "geosite": [
-                  "cn",
-                  "category-companies@cn"
-                ],
-              }
-            ],
+            "geosite": "geolocation-cn",
             "server": "local"
+          }
+        ]
+      }
+    }
+    ```
+
+=== ":material-dns: DNS rules (1.8.0+)"
+
+    !!! info
+    
+        DNS rules are optional if FakeIP is used.
+
+    ```json
+    {
+      "dns": {
+        "servers": [
+          {
+            "tag": "google",
+            "address": "tls://8.8.8.8"
+          },
+          {
+            "tag": "local",
+            "address": "223.5.5.5",
+            "detour": "direct"
+          }
+        ],
+        "rules": [
+          {
+            "outbound": "any",
+            "server": "local"
+          },
+          {
+            "clash_mode": "Direct",
+            "server": "local"
+          },
+          {
+            "clash_mode": "Global",
+            "server": "google"
+          },
+          {
+            "rule_set": "geosite-geolocation-cn",
+            "server": "local"
+          }
+        ]
+      },
+      "route": {
+        "rule_set": [
+          {
+            "type": "remote",
+            "tag": "geosite-geolocation-cn",
+            "format": "binary",
+            "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-cn.srs"
           }
         ]
       }
@@ -402,22 +441,92 @@ flowchart TB
             "outbound": "block"
           },
           {
+            "geosite": "geolocation-cn",
+            "outbound": "direct"
+          }
+        ]
+      }
+    }
+    ```
+
+=== ":material-router-network: Route rules (1.8.0+)"
+
+    ```json
+    {
+      "outbounds": [
+        {
+          "type": "direct",
+          "tag": "direct"
+        },
+        {
+          "type": "block",
+          "tag": "block"
+        }
+      ],
+      "route": {
+        "rules": [
+          {
             "type": "logical",
-            "mode": "and",
+            "mode": "or",
             "rules": [
               {
-                "geosite": "geolocation-!cn",
-                "invert": true
+                "protocol": "dns"
               },
               {
-                "geosite": [
-                  "cn",
-                  "category-companies@cn"
-                ],
-                "geoip": "cn"
+                "port": 53
               }
             ],
+            "outbound": "dns"
+          },
+          {
+            "ip_is_private": true,
             "outbound": "direct"
+          },
+          {
+            "clash_mode": "Direct",
+            "outbound": "direct"
+          },
+          {
+            "clash_mode": "Global",
+            "outbound": "default"
+          },
+          {
+            "type": "logical",
+            "mode": "or",
+            "rules": [
+              {
+                "port": 853
+              },
+              {
+                "network": "udp",
+                "port": 443
+              },
+              {
+                "protocol": "stun"
+              }
+            ],
+            "outbound": "block"
+          },
+          {
+            "rule_set": [
+              "geoip-cn",
+              "geosite-geolocation-cn"
+            ],
+            "outbound": "direct"
+          }
+        ],
+        "rule_set": [
+          {
+            "type": "remote",
+            "tag": "geoip-cn",
+            "format": "binary",
+            "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs"
+          },
+          {
+            "type": "remote",
+            "tag": "geosite-geolocation-cn",
+            "format": "binary",
+            "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-cn.srs"
           }
         ]
       }

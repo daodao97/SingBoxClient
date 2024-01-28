@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/common/badjson"
 	"github.com/sagernet/sing-box/common/urltest"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/outbound"
 	"github.com/sagernet/sing/common"
 	F "github.com/sagernet/sing/common/format"
+	"github.com/sagernet/sing/common/json/badjson"
 	N "github.com/sagernet/sing/common/network"
 
 	"github.com/go-chi/chi/v5"
@@ -105,8 +105,10 @@ func getProxies(server *Server, router adapter.Router) func(w http.ResponseWrite
 			allProxies = append(allProxies, detour.Tag())
 		}
 
-		defaultTag := router.DefaultOutbound(N.NetworkTCP).Tag()
-		if defaultTag == "" {
+		var defaultTag string
+		if defaultOutbound, err := router.DefaultOutbound(N.NetworkTCP); err == nil {
+			defaultTag = defaultOutbound.Tag()
+		} else {
 			defaultTag = allProxies[0]
 		}
 

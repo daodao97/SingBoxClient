@@ -24,7 +24,7 @@ var tlsRegistry []func(conn net.Conn) (loaded bool, netConn net.Conn, reflectTyp
 
 func init() {
 	tlsRegistry = append(tlsRegistry, func(conn net.Conn) (loaded bool, netConn net.Conn, reflectType reflect.Type, reflectPointer uintptr) {
-		tlsConn, loaded := conn.(*tls.Conn)
+		tlsConn, loaded := common.Cast[*tls.Conn](conn)
 		if !loaded {
 			return
 		}
@@ -134,7 +134,7 @@ func (c *VisionConn) Read(p []byte) (n int, err error) {
 			buffers = common.Map(buffers, func(it *buf.Buffer) *buf.Buffer {
 				return it.ToOwned()
 			})
-			chunkBuffer.FullReset()
+			chunkBuffer.Reset()
 		}
 		if c.remainingContent == 0 && c.remainingPadding == 0 {
 			if c.currentCommand == commandPaddingEnd {

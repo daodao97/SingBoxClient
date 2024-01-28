@@ -2,12 +2,14 @@ package adapter
 
 import (
 	"context"
+	"net/http"
 	"net/netip"
 
 	"github.com/sagernet/sing-box/common/geoip"
 	"github.com/sagernet/sing-dns"
 	"github.com/sagernet/sing-tun"
 	"github.com/sagernet/sing/common/control"
+	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/service"
 
 	mdns "github.com/miekg/dns"
@@ -15,11 +17,12 @@ import (
 
 type Router interface {
 	Service
+	PreStarter
 	PostStarter
 
 	Outbounds() []Outbound
 	Outbound(tag string) (Outbound, bool)
-	DefaultOutbound(network string) Outbound
+	DefaultOutbound(network string) (Outbound, error)
 
 	FakeIPStore() FakeIPStore
 
@@ -27,6 +30,8 @@ type Router interface {
 
 	GeoIPReader() *geoip.Reader
 	LoadGeosite(code string) (Rule, error)
+
+	RuleSet(tag string) (RuleSet, bool)
 
 	Exchange(ctx context.Context, message *mdns.Msg) (*mdns.Msg, error)
 	Lookup(ctx context.Context, domain string, strategy dns.DomainStrategy) ([]netip.Addr, error)
@@ -62,11 +67,15 @@ func RouterFromContext(ctx context.Context) Router {
 	return service.FromContext[Router](ctx)
 }
 
+type HeadlessRule interface {
+	Match(metadata *InboundContext) bool
+}
+
 type Rule interface {
+	HeadlessRule
 	Service
 	Type() string
 	UpdateGeosite() error
-	Match(metadata *InboundContext) bool
 	Outbound() string
 	String() string
 }
@@ -75,6 +84,24 @@ type DNSRule interface {
 	Rule
 	DisableCache() bool
 	RewriteTTL() *uint32
+}
+
+type RuleSet interface {
+	StartContext(ctx context.Context, startContext RuleSetStartContext) error
+	PostStart() error
+	Metadata() RuleSetMetadata
+	Close() error
+	HeadlessRule
+}
+
+type RuleSetMetadata struct {
+	ContainsProcessRule bool
+	ContainsWIFIRule    bool
+}
+
+type RuleSetStartContext interface {
+	HTTPClient(detour string, dialer N.Dialer) *http.Client
+	Close()
 }
 
 type InterfaceUpdateListener interface {

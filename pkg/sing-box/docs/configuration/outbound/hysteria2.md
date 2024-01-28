@@ -22,10 +22,6 @@
 }
 ```
 
-!!! warning ""
-
-    QUIC, which is required by Hysteria2 is not included by default, see [Installation](./#installation).
-
 !!! warning "Difference from official Hysteria2"
 
     The official Hysteria2 supports an authentication method called **userpass**,
@@ -88,4 +84,4 @@ Enable debug information logging for Hysteria Brutal CC.
 
 ### Dial Fields
 
-See [Dial Fields](/configuration/shared/dial) for details.
+See [Dial Fields](/configuration/shared/dial/) for details.

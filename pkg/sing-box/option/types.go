@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sagernet/sing-box/common/json"
 	"github.com/sagernet/sing-dns"
 	E "github.com/sagernet/sing/common/exceptions"
 	F "github.com/sagernet/sing/common/format"
+	"github.com/sagernet/sing/common/json"
 	N "github.com/sagernet/sing/common/network"
 
 	mDNS "github.com/miekg/dns"
@@ -83,7 +83,7 @@ func (v NetworkList) Build() []string {
 	return strings.Split(string(v), "\n")
 }
 
-type Listable[T comparable] []T
+type Listable[T any] []T
 
 func (l Listable[T]) MarshalJSON() ([]byte, error) {
 	arrayList := []T(l)
@@ -164,7 +164,7 @@ func (d *Duration) UnmarshalJSON(bytes []byte) error {
 	if err != nil {
 		return err
 	}
-	duration, err := time.ParseDuration(value)
+	duration, err := ParseDuration(value)
 	if err != nil {
 		return err
 	}
@@ -173,6 +173,14 @@ func (d *Duration) UnmarshalJSON(bytes []byte) error {
 }
 
 type DNSQueryType uint16
+
+func (t DNSQueryType) String() string {
+	typeName, loaded := mDNS.TypeToString[uint16(t)]
+	if loaded {
+		return typeName
+	}
+	return F.ToString(uint16(t))
+}
 
 func (t DNSQueryType) MarshalJSON() ([]byte, error) {
 	typeName, loaded := mDNS.TypeToString[uint16(t)]

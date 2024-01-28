@@ -1,7 +1,6 @@
 package trafficontrol
 
 import (
-	"encoding/json"
 	"net"
 	"net/netip"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/atomic"
 	"github.com/sagernet/sing/common/bufio"
+	"github.com/sagernet/sing/common/json"
 	N "github.com/sagernet/sing/common/network"
 
 	"github.com/gofrs/uuid/v5"
@@ -94,7 +94,9 @@ func NewTCPTracker(conn net.Conn, manager *Manager, metadata Metadata, router ad
 	var chain []string
 	var next string
 	if rule == nil {
-		next = router.DefaultOutbound(N.NetworkTCP).Tag()
+		if defaultOutbound, err := router.DefaultOutbound(N.NetworkTCP); err == nil {
+			next = defaultOutbound.Tag()
+		}
 	} else {
 		next = rule.Outbound()
 	}
@@ -181,7 +183,9 @@ func NewUDPTracker(conn N.PacketConn, manager *Manager, metadata Metadata, route
 	var chain []string
 	var next string
 	if rule == nil {
-		next = router.DefaultOutbound(N.NetworkUDP).Tag()
+		if defaultOutbound, err := router.DefaultOutbound(N.NetworkUDP); err == nil {
+			next = defaultOutbound.Tag()
+		}
 	} else {
 		next = rule.Outbound()
 	}

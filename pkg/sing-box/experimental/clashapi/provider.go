@@ -3,9 +3,9 @@ package clashapi
 import (
 	"context"
 	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/common/badjson"
 	"github.com/sagernet/sing/common"
 	F "github.com/sagernet/sing/common/format"
+	"github.com/sagernet/sing/common/json/badjson"
 	"net/http"
 	"time"
 

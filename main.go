@@ -15,7 +15,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	notify "github.com/getlantern/notifier"
 	"github.com/getlantern/systray"
-	"github.com/sagernet/sing-box/common/json"
+	"github.com/sagernet/sing/common/json"
 	"github.com/skratchdot/open-golang/open"
 )
 
@@ -108,12 +108,6 @@ func onReady() {
 	var restartMenu *systray.MenuItem
 
 	startProxy := func(m *systray.MenuItem) {
-		if exist, err := fileExist(filepath.Join(ConfDir, "geoip.db")); err == nil && !exist {
-			notice(&notify.Notification{
-				Title:   "SingBox",
-				Message: "Initializing the environment and the system will boot later",
-			})
-		}
 		err := sb.Start(ConfDir, appConf.ActiveConfig)
 		if err != nil {
 			if strings.Contains(err.Error(), "configure tun interface") {

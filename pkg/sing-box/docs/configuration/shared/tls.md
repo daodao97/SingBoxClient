@@ -1,3 +1,12 @@
+---
+icon: material/alert-decagram
+---
+
+
+!!! quote "Changes in sing-box 1.8.0"
+
+    :material-alert-decagram: [utls](#utls)  
+
 ### Inbound
 
 ```json
@@ -164,10 +173,9 @@ By default, the maximum version is currently TLS 1.3.
 
 #### cipher_suites
 
-The elliptic curves that will be used in an ECDHE handshake, in preference order.
+A list of enabled TLS 1.0–1.2 cipher suites. The order of the list is ignored. Note that TLS 1.3 cipher suites are not configurable.
 
-If empty, the default will be used. The client will use the first preference as the type for its key share in TLS 1.3.
-This may change in the future.
+If empty, a safe default list is used. The default cipher suites might change over time.
 
 #### certificate
 
@@ -199,10 +207,6 @@ The path to the server private key, in PEM format.
 
 ==Client only==
 
-!!! warning ""
-
-    uTLS is not included by default, see [Installation](./#installation).
-
 !!! note ""
 
     uTLS is poorly maintained and the effect may be unproven, use at your own risk.
@@ -211,7 +215,20 @@ uTLS is a fork of "crypto/tls", which provides ClientHello fingerprinting resist
 
 Available fingerprint values:
 
+!!! question "Since sing-box 1.8.0"
+
+    :material-plus: chrome_psk  
+    :material-plus: chrome_psk_shuffle  
+    :material-plus: chrome_padding_psk_shuffle  
+    :material-plus: chrome_pq  
+    :material-plus: chrome_pq_psk
+
 * chrome
+* chrome_psk
+* chrome_psk_shuffle
+* chrome_padding_psk_shuffle
+* chrome_pq
+* chrome_pq_psk
 * firefox
 * edge
 * safari
@@ -225,10 +242,6 @@ Available fingerprint values:
 Chrome fingerprint will be used if empty.
 
 ### ECH Fields
-
-!!! warning ""
-
-    ECH is not included by default, see [Installation](./#installation).
 
 ECH (Encrypted Client Hello) is a TLS extension that allows a client to encrypt the first part of its ClientHello
 message.
@@ -277,10 +290,6 @@ The path to ECH configuration, in PEM format.
 If empty, load from DNS will be attempted.
 
 ### ACME Fields
-
-!!! warning ""
-
-    ACME is not included by default, see [Installation](./#installation).
 
 #### domain
 
@@ -353,17 +362,9 @@ The MAC key.
 
 ACME DNS01 challenge field. If configured, other challenge methods will be disabled.
 
-See [DNS01 Challenge Fields](/configuration/shared/dns01_challenge) for details.
+See [DNS01 Challenge Fields](/configuration/shared/dns01_challenge/) for details.
 
 ### Reality Fields
-
-!!! warning ""
-
-    reality server is not included by default, see [Installation](./#installation).
-
-!!! warning ""
-
-    uTLS, which is required by reality client is not included by default, see [Installation](./#installation).
 
 #### handshake
 
@@ -371,7 +372,7 @@ See [DNS01 Challenge Fields](/configuration/shared/dns01_challenge) for details.
 
 ==Required==
 
-Handshake server address and [Dial options](/configuration/shared/dial).
+Handshake server address and [Dial options](/configuration/shared/dial/).
 
 #### private_key
 

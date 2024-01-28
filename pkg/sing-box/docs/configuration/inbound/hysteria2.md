@@ -26,10 +26,6 @@
 }
 ```
 
-!!! warning ""
-
-    QUIC, which is required by Hysteria2 is not included by default, see [Installation](./#installation).
-
 !!! warning "Difference from official Hysteria2"
 
     The official program supports an authentication method called **userpass**,
@@ -39,7 +35,7 @@
 
 ### Listen Fields
 
-See [Listen Fields](/configuration/shared/listen) for details.
+See [Listen Fields](/configuration/shared/listen/) for details.
 
 ### Fields
 

@@ -12,7 +12,6 @@ import (
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-dns"
-	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
@@ -31,6 +30,7 @@ type Direct struct {
 	fallbackDelay       time.Duration
 	overrideOption      int
 	overrideDestination M.Socksaddr
+	loopBack            *loopBackDetector
 }
 
 func NewDirect(router adapter.Router, logger log.ContextLogger, tag string, options option.DirectOutboundOptions) (*Direct, error) {
@@ -51,6 +51,7 @@ func NewDirect(router adapter.Router, logger log.ContextLogger, tag string, opti
 		domainStrategy: dns.DomainStrategy(options.DomainStrategy),
 		fallbackDelay:  time.Duration(options.FallbackDelay),
 		dialer:         outboundDialer,
+		loopBack:       newLoopBackDetector(),
 	}
 	if options.ProxyProtocol != 0 {
 		return nil, E.New("Proxy Protocol is deprecated and removed in sing-box 1.6.0")
@@ -89,7 +90,11 @@ func (h *Direct) DialContext(ctx context.Context, network string, destination M.
 	case N.NetworkUDP:
 		h.logger.InfoContext(ctx, "outbound packet connection to ", destination)
 	}
-	return h.dialer.DialContext(ctx, network, destination)
+	conn, err := h.dialer.DialContext(ctx, network, destination)
+	if err != nil {
+		return nil, err
+	}
+	return h.loopBack.NewConn(conn), nil
 }
 
 func (h *Direct) DialParallel(ctx context.Context, network string, destination M.Socksaddr, destinationAddresses []netip.Addr) (net.Conn, error) {
@@ -123,6 +128,7 @@ func (h *Direct) ListenPacket(ctx context.Context, destination M.Socksaddr) (net
 	ctx, metadata := adapter.ExtendContext(ctx)
 	metadata.Outbound = h.tag
 	metadata.Destination = destination
+	originDestination := destination
 	switch h.overrideOption {
 	case 1:
 		destination = h.overrideDestination
@@ -142,34 +148,23 @@ func (h *Direct) ListenPacket(ctx context.Context, destination M.Socksaddr) (net
 	if err != nil {
 		return nil, err
 	}
-	if h.overrideOption == 0 {
-		return conn, nil
-	} else {
-		return &overridePacketConn{bufio.NewPacketConn(conn), destination}, nil
+	conn = h.loopBack.NewPacketConn(conn)
+	if originDestination != destination {
+		conn = bufio.NewNATPacketConn(bufio.NewPacketConn(conn), destination, originDestination)
 	}
+	return conn, nil
 }
 
 func (h *Direct) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext) error {
+	if h.loopBack.CheckConn(metadata.Source.AddrPort()) {
+		return E.New("reject loopback connection to ", metadata.Destination)
+	}
 	return NewConnection(ctx, h, conn, metadata)
 }
 
 func (h *Direct) NewPacketConnection(ctx context.Context, conn N.PacketConn, metadata adapter.InboundContext) error {
+	if h.loopBack.CheckPacketConn(metadata.Source.AddrPort()) {
+		return E.New("reject loopback packet connection to ", metadata.Destination)
+	}
 	return NewPacketConnection(ctx, h, conn, metadata)
-}
-
-type overridePacketConn struct {
-	N.NetPacketConn
-	overrideDestination M.Socksaddr
-}
-
-func (c *overridePacketConn) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
-	return c.NetPacketConn.WritePacket(buffer, c.overrideDestination)
-}
-
-func (c *overridePacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
-	return c.NetPacketConn.WriteTo(p, c.overrideDestination.UDPAddr())
-}
-
-func (c *overridePacketConn) Upstream() any {
-	return c.NetPacketConn
 }

@@ -1,7 +1,7 @@
 NAME = sing-box
 COMMIT = $(shell git rev-parse --short HEAD)
-TAGS_GO118 = with_gvisor,with_dhcp,with_wireguard,with_utls,with_reality_server,with_clash_api
-TAGS_GO120 = with_quic,with_ech
+TAGS_GO118 = with_gvisor,with_dhcp,with_wireguard,with_reality_server,with_clash_api
+TAGS_GO120 = with_quic,with_ech,with_utls
 TAGS ?= $(TAGS_GO118),$(TAGS_GO120)
 TAGS_TEST ?= with_gvisor,with_quic,with_wireguard,with_grpc,with_ech,with_utls,with_reality_server
 
@@ -181,9 +181,8 @@ lib_ios:
 	go run ./cmd/internal/build_libbox -target ios
 
 lib_install:
-	go get -v -d
-	go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.0.0-20230915142329-c6740b6d2950
-	go install -v github.com/sagernet/gomobile/cmd/gobind@v0.0.0-20230915142329-c6740b6d2950
+	go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.1
+	go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.1
 
 docs:
 	mkdocs serve

@@ -5,6 +5,7 @@ import "net/netip"
 type TunInboundOptions struct {
 	InterfaceName            string                 `json:"interface_name,omitempty"`
 	MTU                      uint32                 `json:"mtu,omitempty"`
+	GSO                      bool                   `json:"gso,omitempty"`
 	Inet4Address             Listable[netip.Prefix] `json:"inet4_address,omitempty"`
 	Inet6Address             Listable[netip.Prefix] `json:"inet6_address,omitempty"`
 	AutoRoute                bool                   `json:"auto_route,omitempty"`
@@ -23,7 +24,7 @@ type TunInboundOptions struct {
 	IncludePackage           Listable[string]       `json:"include_package,omitempty"`
 	ExcludePackage           Listable[string]       `json:"exclude_package,omitempty"`
 	EndpointIndependentNat   bool                   `json:"endpoint_independent_nat,omitempty"`
-	UDPTimeout               int64                  `json:"udp_timeout,omitempty"`
+	UDPTimeout               UDPTimeoutCompat       `json:"udp_timeout,omitempty"`
 	Stack                    string                 `json:"stack,omitempty"`
 	Platform                 *TunPlatformOptions    `json:"platform,omitempty"`
 	InboundOptions

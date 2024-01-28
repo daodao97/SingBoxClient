@@ -30,34 +30,26 @@ The tag of the dns server.
 
 The address of the dns server.
 
-| Protocol                            | Format                        |
-|-------------------------------------|-------------------------------|
-| `System`                            | `local`                       |
-| `TCP`                               | `tcp://1.0.0.1`               |
-| `UDP`                               | `8.8.8.8` `udp://8.8.4.4`     |
-| `TLS`                               | `tls://dns.google`            |
-| `HTTPS`                             | `https://1.1.1.1/dns-query`   |
-| `QUIC`                              | `quic://dns.adguard.com`      |
-| `HTTP3`                             | `h3://8.8.8.8/dns-query`      |
-| `RCode`                             | `rcode://refused`             |
-| `DHCP`                              | `dhcp://auto` or `dhcp://en0` |
-| [FakeIP](/configuration/dns/fakeip) | `fakeip`                      |
+| Protocol                             | Format                        |
+|--------------------------------------|-------------------------------|
+| `System`                             | `local`                       |
+| `TCP`                                | `tcp://1.0.0.1`               |
+| `UDP`                                | `8.8.8.8` `udp://8.8.4.4`     |
+| `TLS`                                | `tls://dns.google`            |
+| `HTTPS`                              | `https://1.1.1.1/dns-query`   |
+| `QUIC`                               | `quic://dns.adguard.com`      |
+| `HTTP3`                              | `h3://8.8.8.8/dns-query`      |
+| `RCode`                              | `rcode://refused`             |
+| `DHCP`                               | `dhcp://auto` or `dhcp://en0` |
+| [FakeIP](/configuration/dns/fakeip/) | `fakeip`                      |
 
 !!! warning ""
 
-    To ensure that system DNS is in effect, rather than Go's built-in default resolver, enable CGO at compile time.
-
-!!! warning ""
-
-    QUIC and HTTP3 transport is not included by default, see [Installation](./#installation).
+    To ensure that Android system DNS is in effect, rather than Go's built-in default resolver, enable CGO at compile time.
 
 !!! info ""
 
     the RCode transport is often used to block queries. Use with rules and the `disable_cache` rule option.
-
-!!! warning ""
-
-    DHCP transport is not included by default, see [Installation](./#installation).
 
 | RCode             | Description           | 
 |-------------------|-----------------------|

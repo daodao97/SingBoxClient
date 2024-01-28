@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/convert"
-	"github.com/sagernet/sing-box/common/json"
 	"github.com/sagernet/sing-box/common/timer"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/sagernet/sing/common/json"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/service/filemanager"
@@ -224,7 +224,11 @@ func (s *Provider) updateSelected(outboundMap map[string]adapter.Outbound) error
 
 		s.logger.Debug("NewURLTestGroup ", len(outbounds))
 
-		s.group = NewURLTestGroup(s.ctx, s.router, s.logger, outbounds, s.urlTest.Url, interval, 100, true)
+		group, err := NewURLTestGroup(s.ctx, s.router, s.logger, outbounds, s.urlTest.Url, interval, 100, interval, true)
+		if err != nil {
+			return err
+		}
+		s.group = group
 		s.group.PostStart()
 		s.logger.Debug("start NewURLTestGroup")
 

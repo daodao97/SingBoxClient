@@ -1,6 +1,7 @@
 /.idea/
 /vendor/
 /*.json
+/*.srs
 /*.db
 /site/
 /bin/
@@ -17,4 +18,6 @@
 cmd/sing-box/config.json
 cmd/sing-box/*.db
 cmd/sing-box/provider/
+cmd/sing-box/ui/
 cmd/sing-box/sing-box
+

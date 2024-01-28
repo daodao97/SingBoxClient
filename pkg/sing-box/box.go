@@ -9,7 +9,10 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/common/taskmonitor"
+	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/experimental"
+	"github.com/sagernet/sing-box/experimental/cachefile"
 	"github.com/sagernet/sing-box/experimental/libbox/platform"
 	"github.com/sagernet/sing-box/inbound"
 	"github.com/sagernet/sing-box/log"
@@ -32,7 +35,8 @@ type Box struct {
 	outbounds    []adapter.Outbound
 	logFactory   log.Factory
 	logger       log.ContextLogger
-	preServices  map[string]adapter.Service
+	preServices1 map[string]adapter.Service
+	preServices2 map[string]adapter.Service
 	postServices map[string]adapter.Service
 	done         chan struct{}
 }
@@ -45,17 +49,21 @@ type Options struct {
 }
 
 func New(options Options) (*Box, error) {
+	createdAt := time.Now()
 	ctx := options.Context
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	ctx = service.ContextWithDefaultRegistry(ctx)
-	ctx = pause.ContextWithDefaultManager(ctx)
-	createdAt := time.Now()
+	ctx = pause.WithDefaultManager(ctx)
 	experimentalOptions := common.PtrValueOrDefault(options.Experimental)
 	applyDebugOptions(common.PtrValueOrDefault(experimentalOptions.Debug))
+	var needCacheFile bool
 	var needClashAPI bool
 	var needV2RayAPI bool
+	if experimentalOptions.CacheFile != nil && experimentalOptions.CacheFile.Enabled || options.PlatformLogWriter != nil {
+		needCacheFile = true
+	}
 	if experimentalOptions.ClashAPI != nil || options.PlatformLogWriter != nil {
 		needClashAPI = true
 	}
@@ -145,8 +153,17 @@ func New(options Options) (*Box, error) {
 			return nil, E.Cause(err, "initialize platform interface")
 		}
 	}
-	preServices := make(map[string]adapter.Service)
+	preServices1 := make(map[string]adapter.Service)
+	preServices2 := make(map[string]adapter.Service)
 	postServices := make(map[string]adapter.Service)
+	if needCacheFile {
+		cacheFile := service.FromContext[adapter.CacheFile](ctx)
+		if cacheFile == nil {
+			cacheFile = cachefile.New(ctx, common.PtrValueOrDefault(experimentalOptions.CacheFile))
+			service.MustRegister[adapter.CacheFile](ctx, cacheFile)
+		}
+		preServices1["cache file"] = cacheFile
+	}
 	if needClashAPI {
 		clashAPIOptions := common.PtrValueOrDefault(experimentalOptions.ClashAPI)
 		clashAPIOptions.ModeList = experimental.CalculateClashModeList(options.Options)
@@ -155,7 +172,7 @@ func New(options Options) (*Box, error) {
 			return nil, E.Cause(err, "create clash api server")
 		}
 		router.SetClashServer(clashServer)
-		preServices["clash api"] = clashServer
+		preServices2["clash api"] = clashServer
 	}
 	if needV2RayAPI {
 		v2rayServer, err := experimental.NewV2RayServer(logFactory.NewLogger("v2ray-api"), common.PtrValueOrDefault(experimentalOptions.V2RayAPI))
@@ -163,7 +180,7 @@ func New(options Options) (*Box, error) {
 			return nil, E.Cause(err, "create v2ray api server")
 		}
 		router.SetV2RayServer(v2rayServer)
-		preServices["v2ray api"] = v2rayServer
+		preServices2["v2ray api"] = v2rayServer
 	}
 	return &Box{
 		router:       router,
@@ -172,7 +189,8 @@ func New(options Options) (*Box, error) {
 		createdAt:    createdAt,
 		logFactory:   logFactory,
 		logger:       logFactory.Logger(),
-		preServices:  preServices,
+		preServices1: preServices1,
+		preServices2: preServices2,
 		postServices: postServices,
 		done:         make(chan struct{}),
 	}, nil
@@ -217,16 +235,38 @@ func (s *Box) Start() error {
 }
 
 func (s *Box) preStart() error {
-	for serviceName, service := range s.preServices {
+	monitor := taskmonitor.New(s.logger, C.DefaultStartTimeout)
+	monitor.Start("start logger")
+	err := s.logFactory.Start()
+	monitor.Finish()
+	if err != nil {
+		return E.Cause(err, "start logger")
+	}
+	for serviceName, service := range s.preServices1 {
 		if preService, isPreService := service.(adapter.PreStarter); isPreService {
-			s.logger.Trace("pre-start ", serviceName)
+			monitor.Start("pre-start ", serviceName)
 			err := preService.PreStart()
+			monitor.Finish()
 			if err != nil {
-				return E.Cause(err, "pre-starting ", serviceName)
+				return E.Cause(err, "pre-start ", serviceName)
 			}
 		}
 	}
-	err := s.startOutbounds()
+	for serviceName, service := range s.preServices2 {
+		if preService, isPreService := service.(adapter.PreStarter); isPreService {
+			monitor.Start("pre-start ", serviceName)
+			err := preService.PreStart()
+			monitor.Finish()
+			if err != nil {
+				return E.Cause(err, "pre-start ", serviceName)
+			}
+		}
+	}
+	err = s.router.PreStart()
+	if err != nil {
+		return E.Cause(err, "pre-start router")
+	}
+	err = s.startOutbounds()
 	if err != nil {
 		return err
 	}
@@ -238,8 +278,13 @@ func (s *Box) start() error {
 	if err != nil {
 		return err
 	}
-	for serviceName, service := range s.preServices {
-		s.logger.Trace("starting ", serviceName)
+	for serviceName, service := range s.preServices1 {
+		err = service.Start()
+		if err != nil {
+			return E.Cause(err, "start ", serviceName)
+		}
+	}
+	for serviceName, service := range s.preServices2 {
 		err = service.Start()
 		if err != nil {
 			return E.Cause(err, "start ", serviceName)
@@ -252,7 +297,6 @@ func (s *Box) start() error {
 		} else {
 			tag = in.Tag()
 		}
-		s.logger.Trace("initializing inbound/", in.Type(), "[", tag, "]")
 		err = in.Start()
 		if err != nil {
 			return E.Cause(err, "initialize inbound/", in.Type(), "[", tag, "]")
@@ -263,7 +307,6 @@ func (s *Box) start() error {
 
 func (s *Box) postStart() error {
 	for serviceName, service := range s.postServices {
-		s.logger.Trace("starting ", service)
 		err := service.Start()
 		if err != nil {
 			return E.Cause(err, "start ", serviceName)
@@ -271,14 +314,13 @@ func (s *Box) postStart() error {
 	}
 	for _, outbound := range s.outbounds {
 		if lateOutbound, isLateOutbound := outbound.(adapter.PostStarter); isLateOutbound {
-			s.logger.Trace("post-starting outbound/", outbound.Tag())
 			err := lateOutbound.PostStart()
 			if err != nil {
 				return E.Cause(err, "post-start outbound/", outbound.Tag())
 			}
 		}
 	}
-	s.logger.Trace("post-starting router")
+
 	return s.router.PostStart()
 }
 
@@ -289,41 +331,53 @@ func (s *Box) Close() error {
 	default:
 		close(s.done)
 	}
+	monitor := taskmonitor.New(s.logger, C.DefaultStopTimeout)
 	var errors error
 	for serviceName, service := range s.postServices {
-		s.logger.Trace("closing ", serviceName)
+		monitor.Start("close ", serviceName)
 		errors = E.Append(errors, service.Close(), func(err error) error {
 			return E.Cause(err, "close ", serviceName)
 		})
+		monitor.Finish()
 	}
 	for i, in := range s.inbounds {
-		s.logger.Trace("closing inbound/", in.Type(), "[", i, "]")
+		monitor.Start("close inbound/", in.Type(), "[", i, "]")
 		errors = E.Append(errors, in.Close(), func(err error) error {
 			return E.Cause(err, "close inbound/", in.Type(), "[", i, "]")
 		})
+		monitor.Finish()
 	}
 	for i, out := range s.outbounds {
-		s.logger.Trace("closing outbound/", out.Type(), "[", i, "]")
+		monitor.Start("close outbound/", out.Type(), "[", i, "]")
 		errors = E.Append(errors, common.Close(out), func(err error) error {
 			return E.Cause(err, "close outbound/", out.Type(), "[", i, "]")
 		})
+		monitor.Finish()
 	}
-	s.logger.Trace("closing router")
+	monitor.Start("close router")
 	if err := common.Close(s.router); err != nil {
 		errors = E.Append(errors, err, func(err error) error {
 			return E.Cause(err, "close router")
 		})
 	}
-	for serviceName, service := range s.preServices {
-		s.logger.Trace("closing ", serviceName)
+	monitor.Finish()
+	for serviceName, service := range s.preServices1 {
+		monitor.Start("close ", serviceName)
 		errors = E.Append(errors, service.Close(), func(err error) error {
 			return E.Cause(err, "close ", serviceName)
 		})
+		monitor.Finish()
 	}
-	s.logger.Trace("closing log factory")
+	for serviceName, service := range s.preServices2 {
+		monitor.Start("close ", serviceName)
+		errors = E.Append(errors, service.Close(), func(err error) error {
+			return E.Cause(err, "close ", serviceName)
+		})
+		monitor.Finish()
+	}
 	if err := common.Close(s.logFactory); err != nil {
 		errors = E.Append(errors, err, func(err error) error {
-			return E.Cause(err, "close log factory")
+			return E.Cause(err, "close logger")
 		})
 	}
 	return errors
