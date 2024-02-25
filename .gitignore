@@ -2,3 +2,4 @@ build/*.zip
 build/.exe
 .DS_Store
 .idea
+config.json

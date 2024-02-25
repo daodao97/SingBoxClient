@@ -111,10 +111,8 @@ func NewProvider(ctx context.Context, router adapter.Router, logger log.ContextL
 
 func (s *Provider) Network() []string {
 	if s.group != nil {
-		outbound, exists := s.group.Select(N.NetworkTCP)
-		if exists {
-			return outbound.Network()
-		}
+		outbound, _ := s.group.Select(N.NetworkTCP)
+		return outbound.Network()
 	}
 	return s.selected.Network()
 }
@@ -254,10 +252,8 @@ func (s *Provider) updateSelected(outboundMap map[string]adapter.Outbound) error
 
 func (s *Provider) getSelected(network string) adapter.Outbound {
 	if s.group != nil {
-		outbound, exists := s.group.Select(network)
-		if exists {
-			return outbound
-		}
+		outbound, _ := s.group.Select(network)
+		return outbound
 	}
 	return s.selected
 }

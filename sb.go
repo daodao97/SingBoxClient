@@ -2,14 +2,16 @@ package main
 
 import (
 	"context"
-	"github.com/tidwall/jsonc"
 	"log"
 	"os"
 	"path/filepath"
 	runtimeDebug "runtime/debug"
 
+	"github.com/tidwall/jsonc"
+
 	"github.com/pkg/errors"
 	box "github.com/sagernet/sing-box"
+	_ "github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/option"
 )
 
