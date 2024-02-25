@@ -32,6 +32,8 @@ type BoxService struct {
 	instance              *box.Box
 	pauseManager          pause.Manager
 	urlTestHistoryStorage *urltest.HistoryStorage
+
+	servicePauseFields
 }
 
 func NewService(configContent string, platformInterface PlatformInterface) (*BoxService, error) {
@@ -75,14 +77,8 @@ func (s *BoxService) Close() error {
 	return s.instance.Close()
 }
 
-func (s *BoxService) Sleep() {
-	s.pauseManager.DevicePause()
-	_ = s.instance.Router().ResetNetwork()
-}
-
-func (s *BoxService) Wake() {
-	s.pauseManager.DeviceWake()
-	_ = s.instance.Router().ResetNetwork()
+func (s *BoxService) NeedWIFIState() bool {
+	return s.instance.Router().NeedWIFIState()
 }
 
 var (

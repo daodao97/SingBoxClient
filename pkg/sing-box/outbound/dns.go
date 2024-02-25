@@ -241,7 +241,9 @@ func (d *DNS) newPacketConnection(ctx context.Context, conn N.PacketConn, readWa
 					return err
 				}
 				timeout.Update()
-				responseBuffer := buf.NewPacket()
+				var responseLen int
+				response, responseLen = dns.TruncateDNSMessage(&message, response)
+				responseBuffer := buf.NewSize(1024 + responseLen)
 				responseBuffer.Resize(1024, 0)
 				n, err := response.PackBuffer(responseBuffer.FreeBytes())
 				if err != nil {

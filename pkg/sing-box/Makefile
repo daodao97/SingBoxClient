@@ -1,8 +1,9 @@
 NAME = sing-box
 COMMIT = $(shell git rev-parse --short HEAD)
 TAGS_GO118 = with_gvisor,with_dhcp,with_wireguard,with_reality_server,with_clash_api
-TAGS_GO120 = with_quic,with_ech,with_utls
-TAGS ?= $(TAGS_GO118),$(TAGS_GO120)
+TAGS_GO120 = with_quic,with_utls
+TAGS_GO121 = with_ech
+TAGS ?= $(TAGS_GO118),$(TAGS_GO120),$(TAGS_GO121)
 TAGS_TEST ?= with_gvisor,with_quic,with_wireguard,with_grpc,with_ech,with_utls,with_reality_server
 
 GOHOSTOS = $(shell go env GOHOSTOS)
@@ -22,6 +23,10 @@ build:
 ci_build_go118:
 	go build $(PARAMS) $(MAIN)
 	go build $(PARAMS) -tags "$(TAGS_GO118)" $(MAIN)
+
+ci_build_go120:
+	go build $(PARAMS) $(MAIN)
+	go build $(PARAMS) -tags "$(TAGS_GO118),$(TAGS_GO120)" $(MAIN)
 
 ci_build:
 	go build $(PARAMS) $(MAIN)
@@ -61,7 +66,14 @@ proto_install:
 release:
 	go run ./cmd/internal/build goreleaser release --clean --skip-publish || exit 1
 	mkdir dist/release
-	mv dist/*.tar.gz dist/*.zip dist/*.deb dist/*.rpm dist/*.pkg.tar.zst dist/release
+	mv dist/*.tar.gz \
+		dist/*.zip \
+		dist/*.deb \
+		dist/*.rpm \
+		dist/*_amd64.pkg.tar.zst \
+		dist/*_amd64v3.pkg.tar.zst \
+		dist/*_arm64.pkg.tar.zst \
+		dist/release
 	ghr --replace --draft --prerelease -p 3 "v${VERSION}" dist/release
 	rm -r dist/release
 
@@ -73,11 +85,12 @@ update_android_version:
 	go run ./cmd/internal/update_android_version
 
 build_android:
-	cd ../sing-box-for-android && ./gradlew :app:assemblePlayRelease && ./gradlew --stop
+	cd ../sing-box-for-android && ./gradlew :app:assemblePlayRelease && ./gradlew :app:assembleOtherRelease && ./gradlew --stop
 
 upload_android:
 	mkdir -p dist/release_android
 	cp ../sing-box-for-android/app/build/outputs/apk/play/release/*.apk dist/release_android
+	cp ../sing-box-for-android/app/build/outputs/apk/other/release/*-universal.apk dist/release_android
 	ghr --replace --draft --prerelease -p 3 "v${VERSION}" dist/release_android
 	rm -rf dist/release_android
 
@@ -181,8 +194,8 @@ lib_ios:
 	go run ./cmd/internal/build_libbox -target ios
 
 lib_install:
-	go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.1
-	go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.1
+	go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.3
+	go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.3
 
 docs:
 	mkdocs serve

@@ -5,10 +5,6 @@ builds:
     flags:
       - -v
       - -trimpath
-    asmflags:
-      - all=-trimpath={{.Env.GOPATH}}
-    gcflags:
-      - all=-trimpath={{.Env.GOPATH}}
     ldflags:
       - -X github.com/sagernet/sing-box/constant.Version={{ .Version }} -s -w -buildid=
     tags:
@@ -30,6 +26,7 @@ builds:
       - linux_arm64
       - linux_arm_7
       - linux_s390x
+      - linux_riscv64
       - windows_amd64_v1
       - windows_amd64_v3
       - windows_386
@@ -43,10 +40,6 @@ builds:
     flags:
       - -v
       - -trimpath
-    asmflags:
-      - all=-trimpath={{.Env.GOPATH}}
-    gcflags:
-      - all=-trimpath={{.Env.GOPATH}}
     ldflags:
       - -X github.com/sagernet/sing-box/constant.Version={{ .Version }} -s -w -buildid=
     tags:
@@ -54,7 +47,6 @@ builds:
       - with_quic
       - with_dhcp
       - with_wireguard
-      - with_ech
       - with_utls
       - with_reality_server
       - with_acme
@@ -73,10 +65,6 @@ builds:
     flags:
       - -v
       - -trimpath
-    asmflags:
-      - all=-trimpath={{.Env.GOPATH}}
-    gcflags:
-      - all=-trimpath={{.Env.GOPATH}}
     ldflags:
       - -X github.com/sagernet/sing-box/constant.Version={{ .Version }} -s -w -buildid=
     tags:
